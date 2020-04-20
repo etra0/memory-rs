@@ -1,4 +1,5 @@
 use winapi::shared::minwindef::{DWORD};
+use winapi::shared::basetsd::{DWORD_PTR};
 use winapi::um::handleapi;
 use winapi::um::winnt::{HANDLE};
 use winapi::um::tlhelp32;
@@ -48,8 +49,8 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, DWORD> {
 pub fn get_module_base(
     process_id: DWORD,
     module_name: &str
-) -> Result<DWORD, DWORD> {
-    let mut module_base_address: DWORD = 0x0;
+) -> Result<DWORD_PTR, DWORD_PTR> {
+    let mut module_base_address: DWORD_PTR = 0x0;
     let h_snap = unsafe {
         tlhelp32::CreateToolhelp32Snapshot(
             tlhelp32::TH32CS_SNAPMODULE | tlhelp32::TH32CS_SNAPMODULE32,
@@ -72,7 +73,7 @@ pub fn get_module_base(
                     .expect("No string found");
 
                     if current_name == module_name {
-                        break module_entry.modBaseAddr as DWORD;
+                        break module_entry.modBaseAddr as DWORD_PTR;
                     }
 
                     if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
