@@ -1,0 +1,10 @@
+[package]
+name = "memory-rs"
+version = "0.1.0"
+authors = ["Sebastian"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "tlhelp32", "handleapi", "impl-default", "memoryapi"] }
