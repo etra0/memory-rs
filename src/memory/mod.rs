@@ -1,15 +1,13 @@
 use winapi::shared::basetsd::{DWORD_PTR};
-use winapi::um::handleapi;
 use winapi::shared::minwindef::{LPVOID, LPCVOID, DWORD, PDWORD};
 use winapi::um::winnt::{HANDLE, PAGE_EXECUTE_READWRITE};
-use winapi::um::tlhelp32;
 use winapi::um::memoryapi::{ReadProcessMemory, WriteProcessMemory, VirtualProtectEx};
 use std::mem;
 
 pub fn get_aob(h_process: HANDLE, ptr: DWORD_PTR, target: &mut Vec<u8>, n: usize) {
     let mut c_addr = ptr;
     let mut c_value: u8 = 0x0;
-    for i in 0..n {
+    for _ in 0..n {
         unsafe {
             ReadProcessMemory(
                 h_process,
@@ -26,7 +24,7 @@ pub fn get_aob(h_process: HANDLE, ptr: DWORD_PTR, target: &mut Vec<u8>, n: usize
 
 pub fn write_aob(h_process: HANDLE, ptr: DWORD_PTR, source: &Vec<u8>) -> usize {
     let mut protection_bytes: DWORD = 0x0;
-    let mut c_addr = ptr;
+    let c_addr = ptr;
     let size = source.len();
     let mut written = 0;
 

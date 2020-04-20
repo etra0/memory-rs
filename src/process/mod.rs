@@ -1,7 +1,6 @@
 use winapi::shared::minwindef::{DWORD};
 use winapi::shared::basetsd::{DWORD_PTR};
 use winapi::um::handleapi;
-use winapi::um::winnt::{HANDLE};
 use winapi::um::tlhelp32;
 use std::mem;
 use std::ffi::{CStr};
