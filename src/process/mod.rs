@@ -31,12 +31,12 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, DWORD> {
                     }
 
                     if tlhelp32::Process32Next(h_snap, &mut process_entry) == 0 {
-                        panic!("No process match");
+                        break 0;
                     }
                 }
 
             },
-            _ => return Err(0),
+            _ => {},
         }
 
         handleapi::CloseHandle(h_snap);
@@ -64,7 +64,7 @@ pub fn get_module_base(
      
     unsafe {
         match tlhelp32::Module32First(h_snap, &mut module_entry) {
-            0 => panic!("Cannot investigate modules"),
+            0 => {},
             _ => {
                 module_base_address = loop {
                     let current_name = CStr::from_ptr(
@@ -77,7 +77,7 @@ pub fn get_module_base(
                     }
 
                     if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
-                        panic!("No process match");
+                        break 0;
                     }
                 }
 
