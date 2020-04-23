@@ -9,6 +9,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn open_process_and_module() {
         let process_id = super::process::get_process_id("Code.exe")
             .expect("The process ID was not obtained");
@@ -23,6 +24,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_yakuza() {
         use winapi::um::processthreadsapi::OpenProcess;
         let process_id = super::process::get_process_id("Yakuza0.exe")
@@ -77,6 +79,7 @@ mod tests {
             nops.len()
         );
         assert_eq!(orig, nops, "The memory was not written");
-
+        super::memory::hook_function(h_process, module_base_address,
+            module_base_address + 0x100, 5);
     }
 }

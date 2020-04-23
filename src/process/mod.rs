@@ -5,6 +5,8 @@ use winapi::um::tlhelp32;
 use std::mem;
 use std::ffi::{CStr};
 
+pub mod process_wrapper;
+
 pub fn get_process_id(process_name: &str) -> Result<DWORD, DWORD> {
     let mut process_id: DWORD = 0;
     let h_snap = unsafe {
