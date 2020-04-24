@@ -1,11 +1,11 @@
 pub mod process;
 pub mod memory;
 
+
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn dummy() {
+        println!("This is a dummy function");
     }
 
     #[test]
@@ -81,5 +81,8 @@ mod tests {
         assert_eq!(orig, nops, "The memory was not written");
         super::memory::hook_function(h_process, module_base_address,
             module_base_address + 0x100, 5);
+
+        super::memory::inject_shellcode(h_process, 0x14000000,
+            dummy as usize as *const u8);
     }
 }
