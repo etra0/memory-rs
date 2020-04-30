@@ -32,8 +32,6 @@ pub fn write_aob(h_process: HANDLE, ptr: DWORD_PTR, source: &Vec<u8>) -> usize {
     let size = source.len();
     let mut written = 0;
 
-    println!("writing into {:x}", ptr);
-
     unsafe { 
         VirtualProtectEx(
             h_process,
@@ -85,7 +83,6 @@ pub fn hook_function(h_process: HANDLE, to_hook: DWORD_PTR,
 
     // just in case, we nop the space where we are injecting stuff
     let nops = vec![0x90; len];
-    println!("to hook: {:x?}", to_hook);
     write_aob(h_process, to_hook, &nops);
 
     let _diff = f as i64 - to_hook as i64;
@@ -126,7 +123,7 @@ pub fn inject_shellcode(h_process: HANDLE, module_base_address: DWORD_PTR,
 
     let mut shellcode_space: DWORD_PTR = 0x0;
     // try to allocate near module
-    for i in 1..100 {
+    for i in 1..1000 {
         let current_address = module_base_address - (0x1000 * i);
         shellcode_space = unsafe {
             VirtualAllocEx(h_process, current_address as LPVOID,

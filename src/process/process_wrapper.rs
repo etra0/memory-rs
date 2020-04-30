@@ -12,13 +12,17 @@ pub struct Process {
 impl Process {
     // this function takes offsets, *no absolute addresses*
     pub fn write_aob(&self, ptr: DWORD_PTR, data: &Vec<u8>) {
-        super::super::memory::write_aob(self.h_process,
+        crate::memory::write_aob(self.h_process,
             self.module_base_address + ptr, &data);
+    }
+
+    pub fn write_nops(&self, ptr: DWORD_PTR, n: usize) {
+        crate::memory::write_nops(self.h_process, self.module_base_address + ptr, n);
     }
 
     pub fn get_aob(&self, ptr: DWORD_PTR, length: usize) -> Vec<u8> {
         let mut output: Vec<u8> = Vec::new();
-        super::super::memory::get_aob(self.h_process,
+        crate::memory::get_aob(self.h_process,
             self.module_base_address + ptr, &mut output, length);
 
         output
@@ -52,7 +56,7 @@ impl Process {
     }
 
     pub fn hook_function(&self, to_hook: DWORD_PTR, f: DWORD_PTR, len: usize) {
-        super::super::memory::hook_function(self.h_process, to_hook, f, len);
+        crate::memory::hook_function(self.h_process, to_hook, f, len);
     }
 
     pub fn new(process_name: &str) -> Process {
@@ -76,7 +80,7 @@ impl Process {
 
     pub fn inject_shellcode(&self, entry_point: DWORD_PTR,
         instruction_size: usize, f: *const u8) -> DWORD_PTR {
-        super::super::memory::inject_shellcode(self.h_process,
+        crate::memory::inject_shellcode(self.h_process,
             self.module_base_address, entry_point,
             instruction_size, f)
     }
