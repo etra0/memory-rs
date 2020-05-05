@@ -23,7 +23,7 @@ impl Process {
     pub fn get_aob(&self, ptr: DWORD_PTR, length: usize) -> Vec<u8> {
         let mut output: Vec<u8> = Vec::new();
         crate::memory::get_aob(self.h_process,
-            self.module_base_address + ptr, &mut output, length);
+            ptr, &mut output, length);
 
         output
     }
@@ -83,5 +83,34 @@ impl Process {
         crate::memory::inject_shellcode(self.h_process,
             self.module_base_address, entry_point,
             instruction_size, f)
+    }
+
+    pub fn read_string_array(&self, address: DWORD_PTR, starting_index: usize,
+        ending: &Vec<u8>) -> Vec<(usize, String)> {
+
+        let mut c_address = address;
+
+        let mut data: Vec<(usize, String)> = vec![];
+
+        let mut c_index = starting_index;
+
+        let mut c_string = String::from("");
+        loop {
+            let current_read: Vec<u8> = self.get_aob(c_address, 2);
+
+            if current_read == *ending { break; }
+            if current_read[0] == 0x00 { 
+                data.push((c_index, c_string));
+                c_string = String::from("");
+                c_index += 1;
+                c_address += 1;
+                continue;
+            }
+
+            c_string.push(current_read[0] as char);
+            c_address += 1;
+        }
+
+        data
     }
 }
