@@ -3,6 +3,7 @@ use winapi::shared::basetsd::{DWORD_PTR};
 use winapi::shared::minwindef::{LPVOID, LPCVOID};
 use winapi::um::processthreadsapi::OpenProcess;
 use winapi::um::memoryapi::{ReadProcessMemory, WriteProcessMemory};
+use std::io::Error;
 
 pub struct Process {
     h_process: HANDLE,
@@ -59,11 +60,9 @@ impl Process {
         crate::memory::hook_function(self.h_process, to_hook, f, len);
     }
 
-    pub fn new(process_name: &str) -> Process {
-        let process_id = super::get_process_id(process_name)
-            .expect("No process found");
-        let module_base_address = super::get_module_base(process_id, process_name)
-            .expect("No module found");
+    pub fn new(process_name: &str) -> Result<Process, Error> {
+        let process_id = super::get_process_id(process_name)?;
+        let module_base_address = super::get_module_base(process_id, process_name)?;
         
         let h_process = unsafe { OpenProcess(
             winapi::um::winnt::PROCESS_ALL_ACCESS,
@@ -71,11 +70,14 @@ impl Process {
             process_id
         ) };
 
-        assert!(!h_process.is_null());
-        Process {
+        if h_process.is_null() {
+            return Err(Error::last_os_error())
+        }
+
+        Ok(Process {
             h_process,
             module_base_address
-        }
+        })
     }
 
     pub fn inject_shellcode(&self, entry_point: DWORD_PTR,
