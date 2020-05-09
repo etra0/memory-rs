@@ -4,16 +4,18 @@ use winapi::um::handleapi;
 use winapi::um::tlhelp32;
 use std::mem;
 use std::ffi::{CStr};
+use std::io::Error;
 
 pub mod process_wrapper;
 
-pub fn get_process_id(process_name: &str) -> Result<DWORD, DWORD> {
+pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
     let mut process_id: DWORD = 0;
     let h_snap = unsafe {
         tlhelp32::CreateToolhelp32Snapshot(tlhelp32::TH32CS_SNAPPROCESS, 0 ) };
 
-    assert!(h_snap != handleapi::INVALID_HANDLE_VALUE,
-        "An invalid handle was returned");
+    if h_snap == handleapi::INVALID_HANDLE_VALUE {
+        return Err(Error::last_os_error())
+    }
 
     let mut process_entry = tlhelp32::PROCESSENTRY32::default();
     process_entry.dwSize = mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32;
@@ -43,14 +45,17 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, DWORD> {
         handleapi::CloseHandle(h_snap);
     }
 
-    assert!(process_id != 0);
+    if process_id == 0 {
+        return Err(Error::last_os_error())
+    }
+
     Ok(process_id)
 }
 
 pub fn get_module_base(
     process_id: DWORD,
     module_name: &str
-) -> Result<DWORD_PTR, DWORD_PTR> {
+) -> Result<DWORD_PTR, Error> {
     let mut module_base_address: DWORD_PTR = 0x0;
     let h_snap = unsafe {
         tlhelp32::CreateToolhelp32Snapshot(
@@ -58,8 +63,10 @@ pub fn get_module_base(
             process_id)
     };
 
-    assert!(h_snap != handleapi::INVALID_HANDLE_VALUE,
-        "An invalid handle was returned");
+    if h_snap == handleapi::INVALID_HANDLE_VALUE {
+        return Err(Error::last_os_error())
+    }
+
     let mut module_entry = tlhelp32::MODULEENTRY32::default();
     module_entry.dwSize = mem::size_of::<tlhelp32::MODULEENTRY32>() as u32;
      
