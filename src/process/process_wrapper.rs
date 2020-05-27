@@ -81,10 +81,10 @@ impl Process {
     }
 
     pub fn inject_shellcode(&self, entry_point: DWORD_PTR,
-        instruction_size: usize, f: *const u8) -> DWORD_PTR {
+        instruction_size: usize, f_start: *const u8, f_end: *const u8) -> DWORD_PTR {
         crate::memory::inject_shellcode(self.h_process,
             self.module_base_address, entry_point,
-            instruction_size, f)
+            instruction_size, f_start, f_end)
     }
 
     pub fn read_string_array(&self, address: DWORD_PTR, starting_index: usize,

@@ -104,22 +104,13 @@ pub fn hook_function(h_process: HANDLE, to_hook: DWORD_PTR,
 }
 
 pub fn inject_shellcode(h_process: HANDLE, module_base_address: DWORD_PTR,
-    entry_point: DWORD_PTR, instruction_size: usize, f: *const u8) -> DWORD_PTR {
+    entry_point: DWORD_PTR, instruction_size: usize, f_start: *const u8,
+    f_end: *const u8) -> DWORD_PTR {
 
-    // calc the size of the function
-    let mut f_len: isize = 0;
-    loop {
-	if unsafe { std::slice::from_raw_parts(f.offset(f_len), 4) } ==
-	    b"\x90\x90\x90\x90" {
-		break;
-	}
-
-	f_len += 1
-    }
-
+    let f_size = f_end as usize - f_start as usize;
     // get the aob of the function
     let shellcode_bytes: &'static [u8] = unsafe {
-	std::slice::from_raw_parts(f, f_len as usize) };
+	std::slice::from_raw_parts(f_start, f_size) };
 
     let mut shellcode_space: DWORD_PTR = 0x0;
     // try to allocate near module
@@ -135,7 +126,7 @@ pub fn inject_shellcode(h_process: HANDLE, module_base_address: DWORD_PTR,
 
     let written = write_aob(h_process, shellcode_space,
         &shellcode_bytes.to_vec());
-    assert_eq!(written, f_len as usize,
+    assert_eq!(written, f_size,
         "The size of the injection doesnt match");
 
     let module_injection_address = module_base_address + entry_point;
