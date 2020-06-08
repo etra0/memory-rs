@@ -74,7 +74,7 @@ pub fn write_nops(h_process: HANDLE, ptr: DWORD_PTR, n: usize) {
 pub fn hook_function(h_process: HANDLE, to_hook: DWORD_PTR, f: DWORD_PTR, len: usize) {
     use std::mem::transmute;
 
-    assert!(len > 5, "Not enough space to inject the shellcode");
+    assert!(len >= 5, "Not enough space to inject the shellcode");
 
     let mut current_protection: DWORD = 0x0;
 
