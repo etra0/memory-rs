@@ -6,8 +6,8 @@ use winapi::um::processthreadsapi::OpenProcess;
 use winapi::um::winnt::HANDLE;
 
 pub struct Process {
-    h_process: HANDLE,
-    module_base_address: DWORD_PTR,
+    pub h_process: HANDLE,
+    pub module_base_address: DWORD_PTR,
 }
 
 impl Process {
