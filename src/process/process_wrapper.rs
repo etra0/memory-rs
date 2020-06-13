@@ -66,7 +66,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        let output: Vec<u8> = crate::memory::get_aob(self.h_process, addr, length);
+        let output: Vec<u8> = crate::memory::get_aob(self.h_process, addr, n);
 
         output
     }
