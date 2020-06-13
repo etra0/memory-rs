@@ -11,7 +11,30 @@ pub struct Process {
 }
 
 impl Process {
-    // this function takes offsets, *no absolute addresses*
+    pub fn new(process_name: &str) -> Result<Process, Error> {
+        let process_id = super::get_process_id(process_name)?;
+        let module_base_address = super::get_module_base(process_id, process_name)?;
+
+        let h_process = unsafe {
+            OpenProcess(
+                winapi::um::winnt::PROCESS_ALL_ACCESS,
+                false as i32,
+                process_id,
+            )
+        };
+
+        if h_process.is_null() {
+            return Err(Error::last_os_error());
+        }
+
+        Ok(Process {
+            h_process,
+            module_base_address,
+        })
+    }
+
+    /// Writes an array of bytes (as vectors) into the desired address.
+    /// It can take relative or absolute values.
     pub fn write_aob(&self, ptr: DWORD_PTR, data: &Vec<u8>, absolute: bool) {
         let addr = if absolute {
             ptr
@@ -22,6 +45,8 @@ impl Process {
         crate::memory::write_aob(self.h_process, addr, &data);
     }
 
+    /// Writes `n` nops into the desired address
+    /// It can take relative or absolute values.
     pub fn write_nops(&self, ptr: DWORD_PTR, n: usize, absolute: bool) {
         let addr = if absolute {
             ptr
@@ -32,7 +57,9 @@ impl Process {
         crate::memory::write_nops(self.h_process, addr, n);
     }
 
-    pub fn get_aob(&self, ptr: DWORD_PTR, length: usize, absolute: bool) -> Vec<u8> {
+    /// Reads `n` bytes from the desired address
+    /// It can take relative or absolute values.
+    pub fn get_aob(&self, ptr: DWORD_PTR, n: usize, absolute: bool) -> Vec<u8> {
         let addr = if absolute {
             ptr
         } else {
@@ -94,32 +121,9 @@ impl Process {
         assert!(written != 0);
     }
 
-    pub fn hook_function(&self, to_hook: DWORD_PTR, f: DWORD_PTR, len: usize) {
-        crate::memory::hook_function(self.h_process, to_hook, f, len);
-    }
-
-    pub fn new(process_name: &str) -> Result<Process, Error> {
-        let process_id = super::get_process_id(process_name)?;
-        let module_base_address = super::get_module_base(process_id, process_name)?;
-
-        let h_process = unsafe {
-            OpenProcess(
-                winapi::um::winnt::PROCESS_ALL_ACCESS,
-                false as i32,
-                process_id,
-            )
-        };
-
-        if h_process.is_null() {
-            return Err(Error::last_os_error());
-        }
-
-        Ok(Process {
-            h_process,
-            module_base_address,
-        })
-    }
-
+    /// Inject an an ASM function which requires the labels start and
+    /// end as an input, and an entry point where the position will
+    /// be injected.
     pub fn inject_shellcode(
         &self,
         entry_point: DWORD_PTR,
