@@ -42,7 +42,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        crate::memory::write_aob(self.h_process, addr, &data);
+        crate::memory::external::write_aob(self.h_process, addr, &data);
     }
 
     /// Writes `n` nops into the desired address
@@ -54,7 +54,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        crate::memory::write_nops(self.h_process, addr, n);
+        crate::memory::external::write_nops(self.h_process, addr, n);
     }
 
     /// Reads `n` bytes from the desired address
@@ -66,7 +66,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        let output: Vec<u8> = crate::memory::get_aob(self.h_process, addr, n);
+        let output: Vec<u8> = crate::memory::external::get_aob(self.h_process, addr, n);
 
         output
     }
@@ -131,7 +131,7 @@ impl Process {
         f_start: *const u8,
         f_end: *const u8,
     ) -> DWORD_PTR {
-        crate::memory::inject_shellcode(
+        crate::memory::external::inject_shellcode(
             self.h_process,
             self.module_base_address,
             entry_point,
