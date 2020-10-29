@@ -68,38 +68,67 @@ pub fn write_aob(ptr: usize, source: &Vec<u8>) {
     }
 }
 
-pub fn hook_function(original_function: usize, new_function: usize, len: usize) {
+pub fn hook_function(original_function: usize, new_function: usize, new_function_end: usize, len: usize) {
     use std::mem::transmute;
 
-    assert!(len >= 14, "Not enough space to inject the shellcode");
+    assert!(len >= 12, "Not enough space to inject the shellcode");
 
-    let mut current_protection: u32 = 0x0;
+    let mut o_function_prot: u32 = 0x0;
+    let mut n_function_prot: u32 = 0x0;
     unsafe {
         VirtualProtect(
             original_function as LPVOID,
             len,
             PAGE_EXECUTE_READWRITE,
-            &mut current_protection,
+            &mut o_function_prot,
+        );
+
+        VirtualProtect(
+            new_function_end as LPVOID,
+            14,
+            PAGE_EXECUTE_READWRITE,
+            &mut n_function_prot,
         );
     }
 
     let nops = vec![0x90; len];
     write_aob(original_function, &nops);
-    let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
 
-    {
-        let aob: [u8; 8] = unsafe { transmute(new_function.to_le()) };
-        injection.extend_from_slice(&aob);
-    }
+    // Inject the jmp to the original function
+    // address as an AoB
+    let aob: [u8; 8] = unsafe { transmute(new_function.to_le()) };
 
+    let injection = if len < 14 {
+        let mut v = vec![0x48, 0xb8];
+        v.extend_from_slice(&aob);
+        v.extend_from_slice(&[0xff, 0xe0]);
+        v
+    } else {
+        let mut v = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
+        v.extend_from_slice(&aob);
+        v
+    };
     write_aob(original_function, &injection);
+
+    // inject the jmp back to the end of the new function
+    let aob: [u8; 8] = unsafe { transmute((original_function + 14).to_le()) };
+    let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
+    injection.extend_from_slice(&aob);
+    write_aob(new_function_end, &injection);
 
     unsafe {
         VirtualProtect(
             original_function as LPVOID,
             len,
-            current_protection,
-            &mut current_protection,
+            o_function_prot,
+            &mut o_function_prot,
+        );
+
+        VirtualProtect(
+            new_function_end as LPVOID,
+            14,
+            n_function_prot,
+            &mut n_function_prot,
         );
     }
 }
