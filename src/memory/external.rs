@@ -116,9 +116,9 @@ pub fn hook_function(h_process: HANDLE, to_hook: DWORD_PTR, f: DWORD_PTR, len: u
 }
 
 /// This function injects a
-/// shellcode on a desired address. 
+/// shellcode on a desired address.
 /// # Safety
-/// This function is highly unsafe because it will 
+/// This function is highly unsafe because it will
 /// change assembly code of the target program, so
 /// be aware of the crashing, wrong-results, etc.
 pub unsafe fn inject_shellcode(
@@ -137,7 +137,7 @@ pub unsafe fn inject_shellcode(
     // try to allocate near module
     for i in 1..1000 {
         let current_address = module_base_address - (0x1000 * i);
-        shellcode_space =  VirtualAllocEx(
+        shellcode_space = VirtualAllocEx(
             h_process,
             current_address as LPVOID,
             0x1000 as usize,

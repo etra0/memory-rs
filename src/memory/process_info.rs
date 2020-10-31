@@ -1,6 +1,6 @@
 use std::ffi::CString;
-use winapi::shared::minwindef::HMODULE;
 use std::io::Error;
+use winapi::shared::minwindef::HMODULE;
 
 pub struct ProcessInfo {
     pub handle: HMODULE,
@@ -30,9 +30,12 @@ impl ProcessInfo {
             module_size = module_info.SizeOfImage as usize;
             result
         };
-        
+
         if status == 0 {
-            let err_msg = format!("Couldn't get GetModuleInformation, reason: {:?}", Error::last_os_error());
+            let err_msg = format!(
+                "Couldn't get GetModuleInformation, reason: {:?}",
+                Error::last_os_error()
+            );
             return Err(err_msg);
         }
 

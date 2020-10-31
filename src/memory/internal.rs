@@ -34,9 +34,22 @@ macro_rules! main_dll {
     };
 }
 
+// Macro created by t0mstone
+// You can check the original source at
+// https://github.com/T0mstone/tlibs/blob/master/some_macros/src/lib.rs#L23-L29
+#[macro_export]
+macro_rules! count_args {
+    (@one $($t:tt)*) => { 1 };
+    ($(($($x:tt)*)),*$(,)?) => {
+        0 $(+ $crate::count_args!(@one $($x)*))*
+    };
+}
+
 #[macro_export]
 macro_rules! generate_aob_pattern {
     [$($val:tt),* ] => {
+        (
+            $crate::count_args!($(($val)),*),
         |slice: &[u8]| -> bool {
             match slice {
                 [$($val),*] => {
@@ -69,7 +82,12 @@ pub fn write_aob(ptr: usize, source: &[u8]) {
     }
 }
 
-pub fn hook_function(original_function: usize, new_function: usize, new_function_end: usize, len: usize) {
+pub fn hook_function(
+    original_function: usize,
+    new_function: usize,
+    new_function_end: usize,
+    len: usize,
+) {
     use std::mem::transmute;
 
     assert!(len >= 12, "Not enough space to inject the shellcode");
