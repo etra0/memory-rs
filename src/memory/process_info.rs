@@ -10,7 +10,7 @@ pub struct ProcessInfo {
 
 impl ProcessInfo {
     pub fn new(name: &str) -> Result<ProcessInfo, String> {
-        let name = CString::new(name).map_err(|_| "String couldn't be allocated")?;
+        let name = CString::new(name).or(Err("String couldn't be allocated"))?;
 
         let module = unsafe { winapi::um::libloaderapi::GetModuleHandleA(name.as_ptr()) };
 

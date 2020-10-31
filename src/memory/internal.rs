@@ -161,12 +161,12 @@ pub fn scan_aob<F>(
 where
     F: Fn(&[u8]) -> bool,
 {
-    for addr in start_address..(start_address + len - pattern_size) {
-        let c_arr = unsafe { std::slice::from_raw_parts(addr as *mut u8, pattern_size) };
-        if pattern_function(&c_arr) {
-            return Ok(addr);
-        }
-    }
+    let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
-    Err("Couldn't find the requested AOB")
+    let index = data
+        .windows(pattern_size)
+        .position(pattern_function)
+        .ok_or("Couldn't find requested AOB")?;
+
+    Ok(start_address + index)
 }
