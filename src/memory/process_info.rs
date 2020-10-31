@@ -33,7 +33,7 @@ impl ProcessInfo {
         
         if status == 0 {
             let err_msg = format!("Couldn't get GetModuleInformation, reason: {:?}", Error::last_os_error());
-            return Err(err_msg.to_string());
+            return Err(err_msg);
         }
 
         Ok(ProcessInfo {

@@ -35,7 +35,7 @@ impl Process {
 
     /// Writes an array of bytes (as vectors) into the desired address.
     /// It can take relative or absolute values.
-    pub fn write_aob(&self, ptr: DWORD_PTR, data: &Vec<u8>, absolute: bool) {
+    pub fn write_aob(&self, ptr: DWORD_PTR, data: &[u8], absolute: bool) {
         let addr = if absolute {
             ptr
         } else {
@@ -124,7 +124,12 @@ impl Process {
     /// Inject an an ASM function which requires the labels start and
     /// end as an input, and an entry point where the position will
     /// be injected.
-    pub fn inject_shellcode(
+    /// # Safety
+    /// This function is highly unsafe. It can fails for so many reasons
+    /// that the user should be aware when using it. The function
+    /// maybe could not find a code cave, it could not write the
+    /// bytes correctly, or it could just simply fail because OS reasons.
+    pub unsafe fn inject_shellcode(
         &self,
         entry_point: DWORD_PTR,
         instruction_size: usize,
@@ -145,7 +150,7 @@ impl Process {
         &self,
         address: DWORD_PTR,
         starting_index: usize,
-        ending: &Vec<u8>,
+        ending: &[u8],
     ) -> Vec<(usize, String)> {
         let mut c_address = address;
 
@@ -157,7 +162,7 @@ impl Process {
         loop {
             let current_read: Vec<u8> = self.get_aob(c_address, 2, true);
 
-            if current_read == *ending {
+            if current_read[..] == *ending {
                 break;
             }
             if current_read[0] == 0x00 {

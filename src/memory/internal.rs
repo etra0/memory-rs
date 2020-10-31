@@ -47,10 +47,11 @@ macro_rules! generate_aob_pattern {
                 }
             };
         }
+        )
     }
 }
 
-pub fn write_aob(ptr: usize, source: &Vec<u8>) {
+pub fn write_aob(ptr: usize, source: &[u8]) {
     let mut protection_bytes: u32 = 0x0;
     let size = source.len();
 

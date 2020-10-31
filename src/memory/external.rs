@@ -26,7 +26,7 @@ pub fn get_aob(h_process: HANDLE, ptr: DWORD_PTR, n: usize) -> Vec<u8> {
     buffer
 }
 
-pub fn write_aob(h_process: HANDLE, ptr: DWORD_PTR, source: &Vec<u8>) -> usize {
+pub fn write_aob(h_process: HANDLE, ptr: DWORD_PTR, source: &[u8]) -> usize {
     let mut protection_bytes: DWORD = 0x0;
     let c_addr = ptr;
     let size = source.len();
@@ -115,7 +115,13 @@ pub fn hook_function(h_process: HANDLE, to_hook: DWORD_PTR, f: DWORD_PTR, len: u
     }
 }
 
-pub fn inject_shellcode(
+/// This function injects a
+/// shellcode on a desired address. 
+/// # Safety
+/// This function is highly unsafe because it will 
+/// change assembly code of the target program, so
+/// be aware of the crashing, wrong-results, etc.
+pub unsafe fn inject_shellcode(
     h_process: HANDLE,
     module_base_address: DWORD_PTR,
     entry_point: DWORD_PTR,
@@ -125,21 +131,19 @@ pub fn inject_shellcode(
 ) -> DWORD_PTR {
     let f_size = f_end as usize - f_start as usize;
     // get the aob of the function
-    let shellcode_bytes: &'static [u8] = unsafe { std::slice::from_raw_parts(f_start, f_size) };
+    let shellcode_bytes: &'static [u8] = std::slice::from_raw_parts(f_start, f_size);
 
     let mut shellcode_space: DWORD_PTR = 0x0;
     // try to allocate near module
     for i in 1..1000 {
         let current_address = module_base_address - (0x1000 * i);
-        shellcode_space = unsafe {
-            VirtualAllocEx(
-                h_process,
-                current_address as LPVOID,
-                0x1000 as usize,
-                MEM_RESERVE | MEM_COMMIT,
-                PAGE_EXECUTE_READWRITE,
-            ) as DWORD_PTR
-        };
+        shellcode_space =  VirtualAllocEx(
+            h_process,
+            current_address as LPVOID,
+            0x1000 as usize,
+            MEM_RESERVE | MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE,
+        ) as DWORD_PTR;
 
         if shellcode_space != 0 {
             break;

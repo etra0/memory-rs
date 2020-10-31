@@ -20,32 +20,30 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
     process_entry.dwSize = mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32;
 
     unsafe {
-        match tlhelp32::Process32First(h_snap, &mut process_entry) {
-            1 => {
-                process_id = loop {
-                    let current_name = CStr::from_ptr(process_entry.szExeFile.as_ptr())
-                        .to_str()
-                        .expect("No string found");
+        if tlhelp32::Process32First(h_snap, &mut process_entry) == 1 {
+            process_id = loop {
+                let current_name = CStr::from_ptr(process_entry.szExeFile.as_ptr())
+                    .to_str()
+                    .expect("No string found");
 
-                    if current_name == process_name {
-                        break process_entry.th32ProcessID;
-                    }
+                if current_name == process_name {
+                    break process_entry.th32ProcessID;
+                }
 
-                    if tlhelp32::Process32Next(h_snap, &mut process_entry) == 0 {
-                        break 0;
-                    }
+                if tlhelp32::Process32Next(h_snap, &mut process_entry) == 0 {
+                    break 0;
                 }
             }
-            _ => {}
         }
 
         handleapi::CloseHandle(h_snap);
     }
 
-    match process_id {
-        0 => return Err(Error::last_os_error()),
-        _ => return Ok(process_id),
-    };
+    if process_id == 0 {
+        return Err(Error::last_os_error());
+    }
+
+    Ok(process_id)
 }
 
 pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR, Error> {
@@ -65,21 +63,18 @@ pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR
     module_entry.dwSize = mem::size_of::<tlhelp32::MODULEENTRY32>() as u32;
 
     unsafe {
-        match tlhelp32::Module32First(h_snap, &mut module_entry) {
-            0 => {}
-            _ => {
-                module_base_address = loop {
-                    let current_name = CStr::from_ptr(module_entry.szModule.as_ptr())
-                        .to_str()
-                        .expect("No string found");
+        if tlhelp32::Module32First(h_snap, &mut module_entry) != 0 {
+            module_base_address = loop {
+                let current_name = CStr::from_ptr(module_entry.szModule.as_ptr())
+                    .to_str()
+                    .expect("No string found");
 
-                    if current_name == module_name {
-                        break module_entry.modBaseAddr as DWORD_PTR;
-                    }
+                if current_name == module_name {
+                    break module_entry.modBaseAddr as DWORD_PTR;
+                }
 
-                    if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
-                        break 0;
-                    }
+                if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
+                    break 0;
                 }
             }
         }
@@ -87,8 +82,9 @@ pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR
         handleapi::CloseHandle(h_snap);
     }
 
-    match module_base_address {
-        0 => return Err(Error::last_os_error()),
-        _ => return Ok(module_base_address),
+    if module_base_address == 0 {
+        return Err(Error::last_os_error());
     }
+
+    Ok(module_base_address)
 }
