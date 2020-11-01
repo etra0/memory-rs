@@ -8,3 +8,6 @@ edition = "2018"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "tlhelp32", "handleapi", "impl-default", "memoryapi", "processthreadsapi", "psapi", "libloaderapi"] }
+
+[features]
+test_nightly = []
