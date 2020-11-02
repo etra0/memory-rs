@@ -41,3 +41,29 @@ fn test_scan_aob() {
     assert_eq!(p + 5, addr);
 }
 
+fn dummy_function() -> &'static str {
+    println!("I'm `dummy_function`");
+
+    return "I'm the original function";
+}
+
+fn injected_function() -> &'static str {
+    println!("I'm `injected_function`");
+    return "I'm an imposter!";
+}
+
+#[test]
+fn test_injection() {
+    let original_function = dummy_function as *mut u8 as usize;
+    let new_function = injected_function as *mut u8 as usize;
+
+    let res = dummy_function();
+
+    assert_eq!("I'm the original function", res);
+
+    hook_function(original_function, new_function, None, 14);
+
+    let res = dummy_function();
+
+    assert_eq!(res, "I'm an imposter!");
+}

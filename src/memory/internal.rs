@@ -85,7 +85,7 @@ pub fn write_aob(ptr: usize, source: &[u8]) {
 pub fn hook_function(
     original_function: usize,
     new_function: usize,
-    new_function_end: usize,
+    new_function_end: Option<usize>,
     len: usize,
 ) {
     use std::mem::transmute;
@@ -102,12 +102,6 @@ pub fn hook_function(
             &mut o_function_prot,
         );
 
-        VirtualProtect(
-            new_function_end as LPVOID,
-            14,
-            PAGE_EXECUTE_READWRITE,
-            &mut n_function_prot,
-        );
     }
 
     let nops = vec![0x90; len];
@@ -129,12 +123,6 @@ pub fn hook_function(
     };
     write_aob(original_function, &injection);
 
-    // inject the jmp back to the end of the new function
-    let aob: [u8; 8] = unsafe { transmute((original_function + 14).to_le()) };
-    let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
-    injection.extend_from_slice(&aob);
-    write_aob(new_function_end, &injection);
-
     unsafe {
         VirtualProtect(
             original_function as LPVOID,
@@ -142,6 +130,26 @@ pub fn hook_function(
             o_function_prot,
             &mut o_function_prot,
         );
+    }
+
+    // Inject the jmp back if required
+    if new_function_end.is_none() { return; }
+
+    let new_function_end = new_function_end.unwrap();
+    unsafe { 
+        VirtualProtect(
+            new_function_end as LPVOID,
+            14,
+            PAGE_EXECUTE_READWRITE,
+            &mut n_function_prot,
+        );
+    };
+    let aob: [u8; 8] = unsafe { transmute((original_function + 14).to_le()) };
+    let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
+    injection.extend_from_slice(&aob);
+    write_aob(new_function_end, &injection);
+
+    unsafe {
 
         VirtualProtect(
             new_function_end as LPVOID,
