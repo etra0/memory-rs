@@ -1,3 +1,4 @@
+use std::io::Error;
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::VirtualProtect;
@@ -45,6 +46,15 @@ macro_rules! count_args {
     };
 }
 
+macro_rules! try_winapi {
+    ($call:expr, $message:expr) => {{
+        let res = $call;
+        if res == 0 {
+            return Err(format!($message, Error::last_os_error()).into());
+        }
+    }};
+}
+
 /// Returns a tuple where the first value will contain the size of the pattern
 /// and the second value is a lambda that returns true if the pattern is
 /// matched otherwise will return false
@@ -72,20 +82,30 @@ macro_rules! generate_aob_pattern {
 /// This function can cause the target program to crash due to
 /// incorrect writing, or it could simply make crash the software in case
 /// the virtual protect doesn't succeed.
-pub unsafe fn write_aob(ptr: usize, source: &[u8]) {
+pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let mut protection_bytes: u32 = 0x0;
     let size = source.len();
 
-    VirtualProtect(
-        ptr as LPVOID,
-        size,
-        PAGE_EXECUTE_READWRITE,
-        &mut protection_bytes,
+    try_winapi!(
+        VirtualProtect(
+            ptr as LPVOID,
+            size,
+            PAGE_EXECUTE_READWRITE,
+            &mut protection_bytes,
+        ),
+        "First VirtualProtect failed with error code: {:?}"
     );
+
 
     copy_nonoverlapping(source.as_ptr(), ptr as *mut u8, size);
 
-    VirtualProtect(ptr as LPVOID, size, protection_bytes, std::ptr::null_mut());
+    let mut ignored_bytes: u32 = 0x0;
+    try_winapi!(
+        VirtualProtect(ptr as LPVOID, size, protection_bytes, &mut ignored_bytes),
+        "Second VirtualProtect failed with error code: {:?}"
+    );
+
+    Ok(())
 }
 
 /// Injects a jmp in the target address. The minimum length of it is 12 bytes.
@@ -98,7 +118,7 @@ pub unsafe fn hook_function(
     new_function: usize,
     new_function_end: Option<usize>,
     len: usize,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     use std::mem::transmute;
 
     assert!(len >= 12, "Not enough space to inject the shellcode");
@@ -106,16 +126,16 @@ pub unsafe fn hook_function(
     let mut o_function_prot: u32 = 0x0;
     let mut n_function_prot: u32 = 0x0;
 
-    VirtualProtect(
+    try_winapi!(VirtualProtect(
         original_function as LPVOID,
         len,
         PAGE_EXECUTE_READWRITE,
         &mut o_function_prot,
-    );
-
+    ), "Couldn't change original_function protection: {:?}");
 
     let nops = vec![0x90; len];
-    write_aob(original_function, &nops);
+    write_aob(original_function, &nops).map_err(|e| 
+        format!("Couldn't nop original bytes: {:?}", e).to_string())?;
 
     // Inject the jmp to the original function
     // address as an AoB
@@ -131,38 +151,46 @@ pub unsafe fn hook_function(
         v.extend_from_slice(&aob);
         v
     };
-    write_aob(original_function, &injection);
 
-    VirtualProtect(
+    write_aob(original_function, &injection).map_err(|e|
+        format!("Couldn't write the injection to the original function: {:?}",
+            e).to_string())?;
+
+    try_winapi!(VirtualProtect(
         original_function as LPVOID,
         len,
         o_function_prot,
         &mut o_function_prot,
-    );
+    ), "Couldn't restore original_function protection: {:?}");
 
     // Inject the jmp back if required
-    if new_function_end.is_none() { return; }
+    if new_function_end.is_none() {
+        return Ok(());
+    }
 
     let new_function_end = new_function_end.unwrap();
 
-    VirtualProtect(
+    try_winapi!(VirtualProtect(
         new_function_end as LPVOID,
         14,
         PAGE_EXECUTE_READWRITE,
         &mut n_function_prot,
-    );
+    ), "Couldn't change protection of the jmp back: {}");
 
     let aob: [u8; 8] = transmute((original_function + len).to_le());
     let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
     injection.extend_from_slice(&aob);
-    write_aob(new_function_end, &injection);
+    write_aob(new_function_end, &injection).map_err(|e|
+        format!("Couldn't write the return back: {:?}", e))?;
 
-    VirtualProtect(
+    try_winapi!(VirtualProtect(
         new_function_end as LPVOID,
         14,
         n_function_prot,
         &mut n_function_prot,
-    );
+    ), "Couldn't restore protection of the function end: {}");
+
+    Ok(())
 }
 
 /// Search for a pattern using the `pattern_function` argument. The

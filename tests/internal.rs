@@ -6,18 +6,20 @@ static SEARCH_ARRAY: [u8; 10] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0xC0,
 #[test]
 fn test_write_aob() {
     let new_array = vec![0xAA, 0xBB, 0xCC];
-    let pointer = &TO_BE_WRITTEN as *const u8 as usize;
+    let pointer = TO_BE_WRITTEN.as_ptr() as *const u8 as usize;
 
-    unsafe { write_aob(pointer, &new_array) };
+    unsafe { write_aob(pointer, &new_array).unwrap() };
 
     let result_array: [u8; 8] = [0xAA, 0xBB, 0xCC, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
 
+    let equality = TO_BE_WRITTEN.iter().eq(result_array.iter());
 
-    let equality = TO_BE_WRITTEN
-        .iter()
-        .eq(result_array.iter());
-
-    assert!(equality, "Left: {:x?}, Right: {:x?}", &TO_BE_WRITTEN[..], &result_array[..]);
+    assert!(
+        equality,
+        "Left: {:x?}, Right: {:x?}",
+        &TO_BE_WRITTEN[..],
+        &result_array[..]
+    );
 }
 
 #[test]
@@ -36,7 +38,6 @@ fn test_scan_aob() {
     let (size, func) = memory_rs::generate_aob_pattern![0xFF, _, 0xC0];
 
     let addr = unsafe { scan_aob(p, arr_len, func, size).unwrap() };
-
 
     assert_eq!(p + 5, addr);
 }
@@ -61,7 +62,7 @@ fn test_injection() {
 
     assert_eq!("I'm the original function", res);
 
-    unsafe { hook_function(original_function, new_function, None, 14) };
+    unsafe { hook_function(original_function, new_function, None, 14).unwrap() };
 
     let res = dummy_function();
 
