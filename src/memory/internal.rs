@@ -45,6 +45,9 @@ macro_rules! count_args {
     };
 }
 
+/// Returns a tuple where the first value will contain the size of the pattern
+/// and the second value is a lambda that returns true if the pattern is
+/// matched otherwise will return false
 #[macro_export]
 macro_rules! generate_aob_pattern {
     [$($val:tt),* ] => {
@@ -64,25 +67,33 @@ macro_rules! generate_aob_pattern {
     }
 }
 
-pub fn write_aob(ptr: usize, source: &[u8]) {
+/// Write an array of bytes to the desired ptr address.
+/// # Safety
+/// This function can cause the target program to crash due to
+/// incorrect writing, or it could simply make crash the software in case
+/// the virtual protect doesn't succeed.
+pub unsafe fn write_aob(ptr: usize, source: &[u8]) {
     let mut protection_bytes: u32 = 0x0;
     let size = source.len();
 
-    unsafe {
-        VirtualProtect(
-            ptr as LPVOID,
-            size,
-            PAGE_EXECUTE_READWRITE,
-            &mut protection_bytes,
-        );
+    VirtualProtect(
+        ptr as LPVOID,
+        size,
+        PAGE_EXECUTE_READWRITE,
+        &mut protection_bytes,
+    );
 
-        copy_nonoverlapping(source.as_ptr(), ptr as *mut u8, size);
+    copy_nonoverlapping(source.as_ptr(), ptr as *mut u8, size);
 
-        VirtualProtect(ptr as LPVOID, size, protection_bytes, std::ptr::null_mut());
-    }
+    VirtualProtect(ptr as LPVOID, size, protection_bytes, std::ptr::null_mut());
 }
 
-pub fn hook_function(
+/// Injects a jmp in the target address. The minimum length of it is 12 bytes.
+/// In case the space is bigger than 14 bytes, it'll inject a non-dirty
+/// trampoline, and will nop the rest of the instructions.
+/// # Safety
+/// this function is inherently unsafe since it does a lot of nasty stuff.
+pub unsafe fn hook_function(
     original_function: usize,
     new_function: usize,
     new_function_end: Option<usize>,
@@ -94,22 +105,21 @@ pub fn hook_function(
 
     let mut o_function_prot: u32 = 0x0;
     let mut n_function_prot: u32 = 0x0;
-    unsafe {
-        VirtualProtect(
-            original_function as LPVOID,
-            len,
-            PAGE_EXECUTE_READWRITE,
-            &mut o_function_prot,
-        );
 
-    }
+    VirtualProtect(
+        original_function as LPVOID,
+        len,
+        PAGE_EXECUTE_READWRITE,
+        &mut o_function_prot,
+    );
+
 
     let nops = vec![0x90; len];
     write_aob(original_function, &nops);
 
     // Inject the jmp to the original function
     // address as an AoB
-    let aob: [u8; 8] = unsafe { transmute(new_function.to_le()) };
+    let aob: [u8; 8] = transmute(new_function.to_le());
 
     let injection = if len < 14 {
         let mut v = vec![0x48, 0xb8];
@@ -123,44 +133,43 @@ pub fn hook_function(
     };
     write_aob(original_function, &injection);
 
-    unsafe {
-        VirtualProtect(
-            original_function as LPVOID,
-            len,
-            o_function_prot,
-            &mut o_function_prot,
-        );
-    }
+    VirtualProtect(
+        original_function as LPVOID,
+        len,
+        o_function_prot,
+        &mut o_function_prot,
+    );
 
     // Inject the jmp back if required
     if new_function_end.is_none() { return; }
 
     let new_function_end = new_function_end.unwrap();
-    unsafe { 
-        VirtualProtect(
-            new_function_end as LPVOID,
-            14,
-            PAGE_EXECUTE_READWRITE,
-            &mut n_function_prot,
-        );
-    };
-    let aob: [u8; 8] = unsafe { transmute((original_function + 14).to_le()) };
+
+    VirtualProtect(
+        new_function_end as LPVOID,
+        14,
+        PAGE_EXECUTE_READWRITE,
+        &mut n_function_prot,
+    );
+
+    let aob: [u8; 8] = transmute((original_function + len).to_le());
     let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
     injection.extend_from_slice(&aob);
     write_aob(new_function_end, &injection);
 
-    unsafe {
-
-        VirtualProtect(
-            new_function_end as LPVOID,
-            14,
-            n_function_prot,
-            &mut n_function_prot,
-        );
-    }
+    VirtualProtect(
+        new_function_end as LPVOID,
+        14,
+        n_function_prot,
+        &mut n_function_prot,
+    );
 }
 
-pub fn scan_aob<F>(
+/// Search for a pattern using the `pattern_function` argument. The
+/// `pattern_function` receives a lambda with an `&[u8]` as argument and
+/// returns true or false if the pattern is matched. You can generate
+/// that function using `generate_aob_pattern!` macro.
+pub unsafe fn scan_aob<F>(
     start_address: usize,
     len: usize,
     pattern_function: F,
@@ -169,7 +178,7 @@ pub fn scan_aob<F>(
 where
     F: Fn(&[u8]) -> bool,
 {
-    let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
+    let data = std::slice::from_raw_parts(start_address as *mut u8, len);
 
     let index = data
         .windows(pattern_size)

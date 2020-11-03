@@ -8,7 +8,7 @@ fn test_write_aob() {
     let new_array = vec![0xAA, 0xBB, 0xCC];
     let pointer = &TO_BE_WRITTEN as *const u8 as usize;
 
-    write_aob(pointer, &new_array);
+    unsafe { write_aob(pointer, &new_array) };
 
     let result_array: [u8; 8] = [0xAA, 0xBB, 0xCC, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
 
@@ -35,7 +35,7 @@ fn test_scan_aob() {
     let arr_len = SEARCH_ARRAY.len();
     let (size, func) = memory_rs::generate_aob_pattern![0xFF, _, 0xC0];
 
-    let addr = scan_aob(p, arr_len, func, size).unwrap();
+    let addr = unsafe { scan_aob(p, arr_len, func, size).unwrap() };
 
 
     assert_eq!(p + 5, addr);
@@ -61,7 +61,7 @@ fn test_injection() {
 
     assert_eq!("I'm the original function", res);
 
-    hook_function(original_function, new_function, None, 14);
+    unsafe { hook_function(original_function, new_function, None, 14) };
 
     let res = dummy_function();
 

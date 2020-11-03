@@ -2,6 +2,7 @@ use std::ffi::CString;
 use std::io::Error;
 use winapi::shared::minwindef::HMODULE;
 
+/// Struct that contains some very basic information of a executavle or DLL.
 pub struct ProcessInfo {
     pub handle: HMODULE,
     pub addr: usize,
@@ -9,6 +10,8 @@ pub struct ProcessInfo {
 }
 
 impl ProcessInfo {
+    /// Create the ProcessInfo. This function can fail in case where
+    /// the `GetModuleInformation` fails.
     pub fn new(name: &str) -> Result<ProcessInfo, String> {
         let name = CString::new(name).or(Err("String couldn't be allocated"))?;
 
