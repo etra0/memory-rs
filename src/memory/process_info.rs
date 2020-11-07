@@ -2,7 +2,8 @@ use std::ffi::CString;
 use std::io::Error;
 use winapi::shared::minwindef::HMODULE;
 
-/// Struct that contains some very basic information of a executavle or DLL.
+/// Struct that contains some very basic information of a executable or DLL.
+#[derive(Debug)]
 pub struct ProcessInfo {
     pub handle: HMODULE,
     pub addr: usize,

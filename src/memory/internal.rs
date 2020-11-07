@@ -1,8 +1,8 @@
 use std::io::Error;
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
-use winapi::um::memoryapi::VirtualProtect;
-use winapi::um::winnt::PAGE_EXECUTE_READWRITE;
+use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
+use winapi::um::winnt::{PAGE_EXECUTE_READWRITE, MEM_FREE};
 
 #[macro_export]
 macro_rules! main_dll {
@@ -135,7 +135,7 @@ pub unsafe fn hook_function(
 
     let nops = vec![0x90; len];
     write_aob(original_function, &nops).map_err(|e| 
-        format!("Couldn't nop original bytes: {:?}", e).to_string())?;
+        format!("Couldn't nop original bytes: {:?}", e))?;
 
     // Inject the jmp to the original function
     // address as an AoB
@@ -154,7 +154,7 @@ pub unsafe fn hook_function(
 
     write_aob(original_function, &injection).map_err(|e|
         format!("Couldn't write the injection to the original function: {:?}",
-            e).to_string())?;
+            e))?;
 
     try_winapi!(VirtualProtect(
         original_function as LPVOID,
@@ -164,11 +164,10 @@ pub unsafe fn hook_function(
     ), "Couldn't restore original_function protection: {:?}");
 
     // Inject the jmp back if required
-    if new_function_end.is_none() {
-        return Ok(());
-    }
-
-    let new_function_end = new_function_end.unwrap();
+    let new_function_end = match new_function_end {
+        Some(v) => v,
+        None => return Ok(())
+    };
 
     try_winapi!(VirtualProtect(
         new_function_end as LPVOID,
@@ -197,16 +196,36 @@ pub unsafe fn hook_function(
 /// `pattern_function` receives a lambda with an `&[u8]` as argument and
 /// returns true or false if the pattern is matched. You can generate
 /// that function using `generate_aob_pattern!` macro.
-pub unsafe fn scan_aob<F>(
+pub fn scan_aob<F>(
     start_address: usize,
     len: usize,
     pattern_function: F,
     pattern_size: usize,
-) -> Result<usize, &'static str>
+) -> Result<usize, Box<dyn std::error::Error>>
 where
     F: Fn(&[u8]) -> bool,
 {
-    let data = std::slice::from_raw_parts(start_address as *mut u8, len);
+    use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
+
+    let mut information = MEMORY_BASIC_INFORMATION::default();
+    let size = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
+
+    unsafe {
+        try_winapi!(
+            VirtualQuery(start_address as LPVOID, &mut information, size),
+            "VirtualQuery failed: {:?}"
+        );
+    }
+
+    if information.State == MEM_FREE {
+        return Err("The region to scan is invalid".into());
+    }
+
+    if (information.BaseAddress as usize) + (information.RegionSize as usize) < start_address + len {
+        return Err("The region to scan is larger than the region size".into());
+    }
+    
+    let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
     let index = data
         .windows(pattern_size)
