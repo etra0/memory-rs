@@ -204,23 +204,25 @@ where
 {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
 
-    let mut information = MEMORY_BASIC_INFORMATION::default();
-    let size = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
 
-    unsafe {
-        try_winapi!(
-            VirtualQuery(start_address as LPVOID, &mut information, size)
-        );
+    let mut region_size = 0_usize;
+    let size_mem_inf = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
+
+    while region_size < len {
+        let mut information = MEMORY_BASIC_INFORMATION::default();
+        unsafe {
+            try_winapi!(
+                VirtualQuery((start_address + region_size) as LPVOID, &mut information, size_mem_inf)
+            );
+        }
+
+        if information.State == MEM_FREE {
+            return Err(Error::new(ErrorType::Internal, "The region to scan is invalid".to_string()).into());
+        }
+
+        region_size += information.RegionSize as usize;
     }
 
-    if information.State == MEM_FREE {
-        return Err(Error::new(ErrorType::Internal, "The region to scan is invalid".to_string()).into());
-    }
-
-    if (information.BaseAddress as usize) + (information.RegionSize as usize) < start_address + len {
-        return Err(Error::new(ErrorType::Internal, "The region to scan is larger than the region size".to_string()).into());
-    }
-    
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
     let index = data
