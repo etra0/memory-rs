@@ -1,8 +1,9 @@
-use std::io::Error;
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
 use winapi::um::winnt::{PAGE_EXECUTE_READWRITE, MEM_FREE};
+use anyhow::{Context, Result};
+use crate::error::{Error, ErrorType};
 
 #[macro_export]
 macro_rules! main_dll {
@@ -47,12 +48,13 @@ macro_rules! count_args {
 }
 
 macro_rules! try_winapi {
-    ($call:expr, $message:expr) => {{
-        let res = $call;
+    ($call:tt($($args:expr),*)) => {{
+        let res = $call ($($args),*);
         if res == 0 {
-            return Err(format!($message, Error::last_os_error()).into());
+            let msg = format!("{} failed with error code {}", std::stringify!($call), std::io::Error::last_os_error());
+            return Err(Error::new(ErrorType::WinAPI, msg).into());
         }
-    }};
+    }}
 }
 
 /// Returns a tuple where the first value will contain the size of the pattern
@@ -82,18 +84,15 @@ macro_rules! generate_aob_pattern {
 /// This function can cause the target program to crash due to
 /// incorrect writing, or it could simply make crash the software in case
 /// the virtual protect doesn't succeed.
-pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
     let mut protection_bytes: u32 = 0x0;
     let size = source.len();
 
-    try_winapi!(
-        VirtualProtect(
+    try_winapi!(VirtualProtect(
             ptr as LPVOID,
             size,
             PAGE_EXECUTE_READWRITE,
-            &mut protection_bytes,
-        ),
-        "First VirtualProtect failed with error code: {:?}"
+            &mut protection_bytes)
     );
 
 
@@ -101,8 +100,7 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<(), Box<dyn std::er
 
     let mut ignored_bytes: u32 = 0x0;
     try_winapi!(
-        VirtualProtect(ptr as LPVOID, size, protection_bytes, &mut ignored_bytes),
-        "Second VirtualProtect failed with error code: {:?}"
+        VirtualProtect(ptr as LPVOID, size, protection_bytes, &mut ignored_bytes)
     );
 
     Ok(())
@@ -118,7 +116,7 @@ pub unsafe fn hook_function(
     new_function: usize,
     new_function_end: Option<usize>,
     len: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     use std::mem::transmute;
 
     assert!(len >= 12, "Not enough space to inject the shellcode");
@@ -130,12 +128,12 @@ pub unsafe fn hook_function(
         original_function as LPVOID,
         len,
         PAGE_EXECUTE_READWRITE,
-        &mut o_function_prot,
-    ), "Couldn't change original_function protection: {:?}");
+        &mut o_function_prot
+    ));
 
     let nops = vec![0x90; len];
-    write_aob(original_function, &nops).map_err(|e| 
-        format!("Couldn't nop original bytes: {:?}", e))?;
+    write_aob(original_function, &nops)
+        .with_context(|| "Couldn't nop original bytes")?;
 
     // Inject the jmp to the original function
     // address as an AoB
@@ -152,16 +150,15 @@ pub unsafe fn hook_function(
         v
     };
 
-    write_aob(original_function, &injection).map_err(|e|
-        format!("Couldn't write the injection to the original function: {:?}",
-            e))?;
+    write_aob(original_function, &injection)
+        .with_context(|| "Couldn't write the injection to the original function")?;
 
     try_winapi!(VirtualProtect(
         original_function as LPVOID,
         len,
         o_function_prot,
-        &mut o_function_prot,
-    ), "Couldn't restore original_function protection: {:?}");
+        &mut o_function_prot
+    ));
 
     // Inject the jmp back if required
     let new_function_end = match new_function_end {
@@ -173,21 +170,21 @@ pub unsafe fn hook_function(
         new_function_end as LPVOID,
         14,
         PAGE_EXECUTE_READWRITE,
-        &mut n_function_prot,
-    ), "Couldn't change protection of the jmp back: {}");
+        &mut n_function_prot
+    ));
 
     let aob: [u8; 8] = transmute((original_function + len).to_le());
     let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
     injection.extend_from_slice(&aob);
-    write_aob(new_function_end, &injection).map_err(|e|
-        format!("Couldn't write the return back: {:?}", e))?;
+    write_aob(new_function_end, &injection)
+        .with_context(|| "Couldn't write the return back")?;
 
     try_winapi!(VirtualProtect(
         new_function_end as LPVOID,
         14,
         n_function_prot,
-        &mut n_function_prot,
-    ), "Couldn't restore protection of the function end: {}");
+        &mut n_function_prot
+    ));
 
     Ok(())
 }
@@ -201,7 +198,7 @@ pub fn scan_aob<F>(
     len: usize,
     pattern_function: F,
     pattern_size: usize,
-) -> Result<usize, Box<dyn std::error::Error>>
+) -> Result<Option<usize>>
 where
     F: Fn(&[u8]) -> bool,
 {
@@ -212,25 +209,26 @@ where
 
     unsafe {
         try_winapi!(
-            VirtualQuery(start_address as LPVOID, &mut information, size),
-            "VirtualQuery failed: {:?}"
+            VirtualQuery(start_address as LPVOID, &mut information, size)
         );
     }
 
     if information.State == MEM_FREE {
-        return Err("The region to scan is invalid".into());
+        return Err(Error::new(ErrorType::Internal, "The region to scan is invalid".to_string()).into());
     }
 
     if (information.BaseAddress as usize) + (information.RegionSize as usize) < start_address + len {
-        return Err("The region to scan is larger than the region size".into());
+        return Err(Error::new(ErrorType::Internal, "The region to scan is larger than the region size".to_string()).into());
     }
     
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
     let index = data
         .windows(pattern_size)
-        .position(pattern_function)
-        .ok_or("Couldn't find requested AOB")?;
+        .position(pattern_function);
 
-    Ok(start_address + index)
+    match index {
+        Some(addr) => return Ok(Some(start_address + addr)),
+        None => return Ok(None)
+    };
 }

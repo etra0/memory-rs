@@ -37,9 +37,9 @@ fn test_scan_aob() {
     let arr_len = SEARCH_ARRAY.len();
     let (size, func) = memory_rs::generate_aob_pattern![0xFF, _, 0xC0];
 
-    let addr = unsafe { scan_aob(p, arr_len, func, size).unwrap() };
+    let addr = scan_aob(p, arr_len, func, size).unwrap();
 
-    assert_eq!(p + 5, addr);
+    assert_eq!(Some(p + 5), addr);
 }
 
 fn dummy_function() -> &'static str {
