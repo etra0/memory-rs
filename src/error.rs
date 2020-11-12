@@ -1,21 +1,18 @@
 #[derive(Debug, Clone)]
 pub enum ErrorType {
     WinAPI,
-    Internal
+    Internal,
 }
 
 #[derive(Debug, Clone)]
 pub struct Error {
     kind: ErrorType,
-    msg: String
+    msg: String,
 }
 
 impl Error {
     pub fn new(kind: ErrorType, msg: String) -> Error {
-        Error {
-            kind,
-            msg
-        }
+        Error { kind, msg }
     }
 }
 

@@ -1,9 +1,9 @@
+use crate::error::{Error, ErrorType};
+use anyhow::{Context, Result};
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
-use winapi::um::winnt::{PAGE_EXECUTE_READWRITE, MEM_FREE};
-use anyhow::{Context, Result};
-use crate::error::{Error, ErrorType};
+use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 
 #[macro_export]
 macro_rules! main_dll {
@@ -89,19 +89,21 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
     let size = source.len();
 
     try_winapi!(VirtualProtect(
-            ptr as LPVOID,
-            size,
-            PAGE_EXECUTE_READWRITE,
-            &mut protection_bytes)
-    );
-
+        ptr as LPVOID,
+        size,
+        PAGE_EXECUTE_READWRITE,
+        &mut protection_bytes
+    ));
 
     copy_nonoverlapping(source.as_ptr(), ptr as *mut u8, size);
 
     let mut ignored_bytes: u32 = 0x0;
-    try_winapi!(
-        VirtualProtect(ptr as LPVOID, size, protection_bytes, &mut ignored_bytes)
-    );
+    try_winapi!(VirtualProtect(
+        ptr as LPVOID,
+        size,
+        protection_bytes,
+        &mut ignored_bytes
+    ));
 
     Ok(())
 }
@@ -132,8 +134,7 @@ pub unsafe fn hook_function(
     ));
 
     let nops = vec![0x90; len];
-    write_aob(original_function, &nops)
-        .with_context(|| "Couldn't nop original bytes")?;
+    write_aob(original_function, &nops).with_context(|| "Couldn't nop original bytes")?;
 
     // Inject the jmp to the original function
     // address as an AoB
@@ -163,7 +164,7 @@ pub unsafe fn hook_function(
     // Inject the jmp back if required
     let new_function_end = match new_function_end {
         Some(v) => v,
-        None => return Ok(())
+        None => return Ok(()),
     };
 
     try_winapi!(VirtualProtect(
@@ -176,8 +177,7 @@ pub unsafe fn hook_function(
     let aob: [u8; 8] = transmute((original_function + len).to_le());
     let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
     injection.extend_from_slice(&aob);
-    write_aob(new_function_end, &injection)
-        .with_context(|| "Couldn't write the return back")?;
+    write_aob(new_function_end, &injection).with_context(|| "Couldn't write the return back")?;
 
     try_winapi!(VirtualProtect(
         new_function_end as LPVOID,
@@ -204,20 +204,25 @@ where
 {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
 
-
     let mut region_size = 0_usize;
     let size_mem_inf = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
 
     while region_size < len {
         let mut information = MEMORY_BASIC_INFORMATION::default();
         unsafe {
-            try_winapi!(
-                VirtualQuery((start_address + region_size) as LPVOID, &mut information, size_mem_inf)
-            );
+            try_winapi!(VirtualQuery(
+                (start_address + region_size) as LPVOID,
+                &mut information,
+                size_mem_inf
+            ));
         }
 
         if information.State == MEM_FREE {
-            return Err(Error::new(ErrorType::Internal, "The region to scan is invalid".to_string()).into());
+            return Err(Error::new(
+                ErrorType::Internal,
+                "The region to scan is invalid".to_string(),
+            )
+            .into());
         }
 
         region_size += information.RegionSize as usize;
@@ -225,12 +230,10 @@ where
 
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
-    let index = data
-        .windows(pattern_size)
-        .position(pattern_function);
+    let index = data.windows(pattern_size).position(pattern_function);
 
     match index {
-        Some(addr) => return Ok(Some(start_address + addr)),
-        None => return Ok(None)
-    };
+        Some(addr) => Ok(Some(start_address + addr)),
+        None => Ok(None)
+    }
 }
