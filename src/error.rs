@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ErrorType {
     WinAPI,
     Internal,
@@ -13,6 +13,14 @@ pub struct Error {
 impl Error {
     pub fn new(kind: ErrorType, msg: String) -> Error {
         Error { kind, msg }
+    }
+
+    pub fn kind(&self) -> ErrorType {
+        self.kind
+    }
+
+    pub fn msg(&self) -> String {
+        self.msg.clone()
     }
 }
 

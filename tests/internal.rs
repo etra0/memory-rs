@@ -42,6 +42,44 @@ fn test_scan_aob() {
     assert_eq!(Some(p + 5), addr);
 }
 
+#[test]
+fn test_scan_aob_not_valid_memory() {
+    use memory_rs::error;
+
+    let p = 0x1234_5678;
+    let len = 0xFFFF;
+    let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+
+    let addr = scan_aob(p, len, func, size);
+    
+    if let Err(e) = addr {
+        let e: error::Error = e.downcast().unwrap();
+        assert_eq!(e.kind(), error::ErrorType::Internal);
+        assert_eq!(e.msg(), "The region to scan is invalid".to_string());
+    } else {
+        panic!("Should have get an error");
+    }
+}
+
+#[test]
+fn test_scan_aob_out_of_bounds() {
+    use memory_rs::error;
+
+    let p = &SEARCH_ARRAY as *const u8 as usize;
+    let len = 0xFFFFFFFFFF;
+    let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+
+    let addr = scan_aob(p, len, func, size);
+    
+    if let Err(e) = addr {
+        let e: error::Error = e.downcast().unwrap();
+        assert_eq!(e.kind(), error::ErrorType::Internal);
+        assert_eq!(e.msg(), "The region to scan is invalid".to_string());
+    } else {
+        panic!("Should have get an error");
+    }
+}
+
 fn dummy_function() -> &'static str {
     println!("I'm `dummy_function`");
 
