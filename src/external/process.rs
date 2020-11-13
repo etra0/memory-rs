@@ -1,8 +1,13 @@
+use std::ffi::CStr;
 use std::io::Error;
+use std::mem;
 use winapi::shared::basetsd::DWORD_PTR;
+use winapi::shared::minwindef::DWORD;
 use winapi::shared::minwindef::{LPCVOID, LPVOID};
+use winapi::um::handleapi;
 use winapi::um::memoryapi::{ReadProcessMemory, WriteProcessMemory};
 use winapi::um::processthreadsapi::OpenProcess;
+use winapi::um::tlhelp32;
 use winapi::um::winnt::HANDLE;
 
 pub struct Process {
@@ -12,8 +17,8 @@ pub struct Process {
 
 impl Process {
     pub fn new(process_name: &str) -> Result<Process, Error> {
-        let process_id = super::get_process_id(process_name)?;
-        let module_base_address = super::get_module_base(process_id, process_name)?;
+        let process_id = get_process_id(process_name)?;
+        let module_base_address = get_module_base(process_id, process_name)?;
 
         let h_process = unsafe {
             OpenProcess(
@@ -42,7 +47,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        crate::memory::external::write_aob(self.h_process, addr, &data);
+        crate::external::memory::write_aob(self.h_process, addr, &data);
     }
 
     /// Writes `n` nops into the desired address
@@ -54,7 +59,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        crate::memory::external::write_nops(self.h_process, addr, n);
+        crate::external::memory::write_nops(self.h_process, addr, n);
     }
 
     /// Reads `n` bytes from the desired address
@@ -66,7 +71,7 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        let output: Vec<u8> = crate::memory::external::get_aob(self.h_process, addr, n);
+        let output: Vec<u8> = crate::external::memory::get_aob(self.h_process, addr, n);
 
         output
     }
@@ -136,7 +141,7 @@ impl Process {
         f_start: *const u8,
         f_end: *const u8,
     ) -> DWORD_PTR {
-        crate::memory::external::inject_shellcode(
+        crate::external::memory::inject_shellcode(
             self.h_process,
             self.module_base_address,
             entry_point,
@@ -179,4 +184,86 @@ impl Process {
 
         data
     }
+}
+
+
+pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
+    let mut process_id: DWORD = 0;
+    let h_snap = unsafe { tlhelp32::CreateToolhelp32Snapshot(tlhelp32::TH32CS_SNAPPROCESS, 0) };
+
+    if h_snap == handleapi::INVALID_HANDLE_VALUE {
+        return Err(Error::last_os_error());
+    }
+
+    let mut process_entry = tlhelp32::PROCESSENTRY32::default();
+    process_entry.dwSize = mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32;
+
+    unsafe {
+        if tlhelp32::Process32First(h_snap, &mut process_entry) == 1 {
+            process_id = loop {
+                let current_name = CStr::from_ptr(process_entry.szExeFile.as_ptr())
+                    .to_str()
+                    .expect("No string found");
+
+                if current_name == process_name {
+                    break process_entry.th32ProcessID;
+                }
+
+                if tlhelp32::Process32Next(h_snap, &mut process_entry) == 0 {
+                    break 0;
+                }
+            }
+        }
+
+        handleapi::CloseHandle(h_snap);
+    }
+
+    if process_id == 0 {
+        return Err(Error::last_os_error());
+    }
+
+    Ok(process_id)
+}
+
+pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR, Error> {
+    let mut module_base_address: DWORD_PTR = 0x0;
+    let h_snap = unsafe {
+        tlhelp32::CreateToolhelp32Snapshot(
+            tlhelp32::TH32CS_SNAPMODULE | tlhelp32::TH32CS_SNAPMODULE32,
+            process_id,
+        )
+    };
+
+    if h_snap == handleapi::INVALID_HANDLE_VALUE {
+        return Err(Error::last_os_error());
+    }
+
+    let mut module_entry = tlhelp32::MODULEENTRY32::default();
+    module_entry.dwSize = mem::size_of::<tlhelp32::MODULEENTRY32>() as u32;
+
+    unsafe {
+        if tlhelp32::Module32First(h_snap, &mut module_entry) != 0 {
+            module_base_address = loop {
+                let current_name = CStr::from_ptr(module_entry.szModule.as_ptr())
+                    .to_str()
+                    .expect("No string found");
+
+                if current_name == module_name {
+                    break module_entry.modBaseAddr as DWORD_PTR;
+                }
+
+                if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
+                    break 0;
+                }
+            }
+        }
+
+        handleapi::CloseHandle(h_snap);
+    }
+
+    if module_base_address == 0 {
+        return Err(Error::last_os_error());
+    }
+
+    Ok(module_base_address)
 }

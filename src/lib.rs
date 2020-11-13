@@ -1,4 +1,4 @@
 #[macro_use]
-pub mod memory;
+pub mod internal;
 pub mod error;
-pub mod process;
+pub mod external;
