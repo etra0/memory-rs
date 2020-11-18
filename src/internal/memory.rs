@@ -4,6 +4,7 @@ use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
 use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
+use winapi::um::processthreadsapi::{GetCurrentProcess, FlushInstructionCache};
 
 #[macro_export]
 macro_rules! main_dll {
@@ -105,6 +106,9 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
         protection_bytes,
         &mut ignored_bytes
     ));
+    
+    let ph = GetCurrentProcess();
+    FlushInstructionCache(ph, ptr as LPVOID, size);
 
     Ok(())
 }
@@ -117,16 +121,20 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
 pub unsafe fn hook_function(
     original_function: usize,
     new_function: usize,
-    new_function_end: Option<usize>,
+    new_function_end: Option<&mut usize>,
     len: usize,
 ) -> Result<()> {
     use std::mem::transmute;
 
     assert!(len >= 12, "Not enough space to inject the shellcode");
 
+    let ph = GetCurrentProcess();
+
     let mut o_function_prot: u32 = 0x0;
     let mut n_function_prot: u32 = 0x0;
+    let mut ignored_prot: u32 = 0x0;
 
+    // Unprotect zone we'll write
     try_winapi!(VirtualProtect(
         original_function as LPVOID,
         len,
@@ -155,11 +163,13 @@ pub unsafe fn hook_function(
     write_aob(original_function, &injection)
         .with_context(|| "Couldn't write the injection to the original function")?;
 
+    FlushInstructionCache(ph, original_function as LPVOID, injection.len());
+
     try_winapi!(VirtualProtect(
         original_function as LPVOID,
         len,
         o_function_prot,
-        &mut o_function_prot
+        &mut ignored_prot
     ));
 
     // Inject the jmp back if required
@@ -168,24 +178,7 @@ pub unsafe fn hook_function(
         None => return Ok(()),
     };
 
-    try_winapi!(VirtualProtect(
-        new_function_end as LPVOID,
-        14,
-        PAGE_EXECUTE_READWRITE,
-        &mut n_function_prot
-    ));
-
-    let aob: [u8; 8] = transmute((original_function + len).to_le());
-    let mut injection = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
-    injection.extend_from_slice(&aob);
-    write_aob(new_function_end, &injection).with_context(|| "Couldn't write the return back")?;
-
-    try_winapi!(VirtualProtect(
-        new_function_end as LPVOID,
-        14,
-        n_function_prot,
-        &mut n_function_prot
-    ));
+    *new_function_end = original_function + len;
 
     Ok(())
 }
