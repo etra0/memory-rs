@@ -47,12 +47,13 @@ macro_rules! count_args {
     };
 }
 
+#[macro_export]
 macro_rules! try_winapi {
     ($call:tt($($args:expr),*)) => {{
         let res = $call ($($args),*);
         if res == 0 {
             let msg = format!("{} failed with error code {}", std::stringify!($call), std::io::Error::last_os_error());
-            return Err(Error::new(ErrorType::WinAPI, msg).into());
+            return Err($crate::error::Error::new($crate::error::ErrorType::WinAPI, msg).into());
         }
     }}
 }
