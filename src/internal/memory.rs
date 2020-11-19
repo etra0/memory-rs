@@ -5,6 +5,7 @@ use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
 use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 use winapi::um::processthreadsapi::{GetCurrentProcess, FlushInstructionCache};
+use crate::{try_winapi};
 
 #[macro_export]
 macro_rules! main_dll {
@@ -37,49 +38,6 @@ macro_rules! main_dll {
     };
 }
 
-// Macro created by t0mstone
-// You can check the original source at
-// https://github.com/T0mstone/tlibs/blob/master/some_macros/src/lib.rs#L23-L29
-#[macro_export]
-macro_rules! count_args {
-    (@one $($t:tt)*) => { 1 };
-    ($(($($x:tt)*)),*$(,)?) => {
-        0 $(+ $crate::count_args!(@one $($x)*))*
-    };
-}
-
-#[macro_export]
-macro_rules! try_winapi {
-    ($call:tt($($args:expr),*)) => {{
-        let res = $call ($($args),*);
-        if res == 0 {
-            let msg = format!("{} failed with error code {}", std::stringify!($call), std::io::Error::last_os_error());
-            return Err($crate::error::Error::new($crate::error::ErrorType::WinAPI, msg).into());
-        }
-    }}
-}
-
-/// Returns a tuple where the first value will contain the size of the pattern
-/// and the second value is a lambda that returns true if the pattern is
-/// matched otherwise will return false
-#[macro_export]
-macro_rules! generate_aob_pattern {
-    [$($val:tt),* ] => {
-        (
-            $crate::count_args!($(($val)),*),
-        |slice: &[u8]| -> bool {
-            match slice {
-                [$($val),*] => {
-                    return true;
-                },
-                _ => {
-                    return false;
-                }
-            };
-        }
-        )
-    }
-}
 
 /// Write an array of bytes to the desired ptr address.
 /// # Safety
@@ -131,7 +89,6 @@ pub unsafe fn hook_function(
     let ph = GetCurrentProcess();
 
     let mut o_function_prot: u32 = 0x0;
-    let mut n_function_prot: u32 = 0x0;
     let mut ignored_prot: u32 = 0x0;
 
     // Unprotect zone we'll write
