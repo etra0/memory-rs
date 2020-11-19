@@ -29,7 +29,6 @@ macro_rules! scoped_no_mangle {
     }
 }
 
-
 /// Returns a tuple where the first value will contain the size of the pattern
 /// and the second value is a lambda that returns true if the pattern is
 /// matched otherwise will return false

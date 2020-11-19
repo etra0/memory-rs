@@ -1,11 +1,11 @@
-use anyhow::{Context, Result};
 use crate::error::{Error, ErrorType};
 use crate::internal::process_info::ProcessInfo;
-use crate::{try_winapi};
+use crate::try_winapi;
+use anyhow::{Context, Result};
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
-use winapi::um::processthreadsapi::{GetCurrentProcess, FlushInstructionCache};
+use winapi::um::processthreadsapi::{FlushInstructionCache, GetCurrentProcess};
 use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 
 #[macro_export]
@@ -39,7 +39,6 @@ macro_rules! main_dll {
     };
 }
 
-
 /// Write an array of bytes to the desired ptr address.
 /// # Safety
 /// This function can cause the target program to crash due to
@@ -65,7 +64,7 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
         protection_bytes,
         &mut ignored_bytes
     ));
-    
+
     let ph = GetCurrentProcess();
     FlushInstructionCache(ph, ptr as LPVOID, size);
 
@@ -186,10 +185,9 @@ where
 
     match index {
         Some(addr) => Ok(Some(start_address + addr)),
-        None => Ok(None)
+        None => Ok(None),
     }
 }
-
 
 /// Struct that contains its entry point and original bytes.
 /// The purpose of this struct is that when it goes out of scope,
@@ -198,11 +196,16 @@ where
 pub struct Detour {
     pub entry_point: usize,
     /// Original bytes where the entry_point points.
-    f_orig: Vec<u8>
+    f_orig: Vec<u8>,
 }
 
 impl Detour {
-    fn new(entry_point: usize, size: usize, new_function: usize, function_end: Option<&mut usize>) -> Detour {
+    fn new(
+        entry_point: usize,
+        size: usize,
+        new_function: usize,
+        function_end: Option<&mut usize>,
+    ) -> Detour {
         let mut f_orig = vec![];
 
         unsafe {
@@ -216,7 +219,7 @@ impl Detour {
 
         Detour {
             entry_point,
-            f_orig
+            f_orig,
         }
     }
 
@@ -228,18 +231,25 @@ impl Detour {
         new_function: usize,
         function_end: Option<&mut usize>,
         size_injection: usize,
-        offset: Option<isize>
-        ) -> Result<Detour>
-    where T: Fn(&[u8]) -> bool {
+        offset: Option<isize>,
+    ) -> Result<Detour>
+    where
+        T: Fn(&[u8]) -> bool,
+    {
         let (size, func) = scan;
-        let mut entry_point = scan_aob(process_inf.addr, process_inf.size, func,
-            size)?.context("Couldn't find aob")?;
+        let mut entry_point = scan_aob(process_inf.addr, process_inf.size, func, size)?
+            .context("Couldn't find aob")?;
 
         if let Some(v) = offset {
             entry_point = ((entry_point as isize) + v) as usize;
         }
 
-        Ok(Detour::new(entry_point, size_injection, new_function, function_end))
+        Ok(Detour::new(
+            entry_point,
+            size_injection,
+            new_function,
+            function_end,
+        ))
     }
 }
 
@@ -247,8 +257,7 @@ impl Drop for Detour {
     fn drop(&mut self) {
         unsafe {
             println!("Detour at {:x} was dropped", self.entry_point);
-            write_aob(self.entry_point, &self.f_orig)
-                .expect("Couldn't restore original bytes");
+            write_aob(self.entry_point, &self.f_orig).expect("Couldn't restore original bytes");
         }
     }
 }

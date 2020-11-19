@@ -51,7 +51,7 @@ fn test_scan_aob_not_valid_memory() {
     let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
 
     let addr = scan_aob(p, len, func, size);
-    
+
     if let Err(e) = addr {
         let e: error::Error = e.downcast().unwrap();
         assert_eq!(e.kind(), error::ErrorType::Internal);
@@ -70,7 +70,7 @@ fn test_scan_aob_out_of_bounds() {
     let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
 
     let addr = scan_aob(p, len, func, size);
-    
+
     if let Err(e) = addr {
         let e: error::Error = e.downcast().unwrap();
         assert_eq!(e.kind(), error::ErrorType::Internal);
