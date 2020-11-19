@@ -191,10 +191,14 @@ where
 }
 
 
+/// Struct that contains its entry point and original bytes.
+/// The purpose of this struct is that when it goes out of scope,
+/// it automatically removes the modified bytes in order to do a clean
+/// remove of the DLL.
 pub struct Detour {
     pub entry_point: usize,
     /// Original bytes where the entry_point points.
-    f_orig: Vec<u8>,
+    f_orig: Vec<u8>
 }
 
 impl Detour {
@@ -216,6 +220,8 @@ impl Detour {
         }
     }
 
+    /// Creates a Detour from aobscan. This function can fail
+    /// in the case when the scan_aob can't find it's target.
     pub fn new_from_aob<T>(
         scan: (usize, T),
         process_inf: &ProcessInfo,
