@@ -1,11 +1,12 @@
-use crate::error::{Error, ErrorType};
 use anyhow::{Context, Result};
+use crate::error::{Error, ErrorType};
+use crate::internal::process_info::ProcessInfo;
+use crate::{try_winapi};
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
-use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 use winapi::um::processthreadsapi::{GetCurrentProcess, FlushInstructionCache};
-use crate::{try_winapi};
+use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 
 #[macro_export]
 macro_rules! main_dll {
@@ -186,5 +187,62 @@ where
     match index {
         Some(addr) => Ok(Some(start_address + addr)),
         None => Ok(None)
+    }
+}
+
+
+pub struct Detour {
+    pub entry_point: usize,
+    /// Original bytes where the entry_point points.
+    f_orig: Vec<u8>,
+}
+
+impl Detour {
+    fn new(entry_point: usize, size: usize, new_function: usize, function_end: Option<&mut usize>) -> Detour {
+        let mut f_orig = vec![];
+
+        unsafe {
+            let slice_ = std::slice::from_raw_parts(entry_point as *mut u8, size);
+            f_orig.extend_from_slice(slice_);
+        }
+
+        unsafe {
+            hook_function(entry_point, new_function, function_end, size).unwrap();
+        }
+
+        Detour {
+            entry_point,
+            f_orig
+        }
+    }
+
+    pub fn new_from_aob<T>(
+        scan: (usize, T),
+        process_inf: &ProcessInfo,
+        new_function: usize,
+        function_end: Option<&mut usize>,
+        size_injection: usize,
+        offset: Option<isize>
+        ) -> Result<Detour>
+    where T: Fn(&[u8]) -> bool {
+        let (size, func) = scan;
+        let mut entry_point = scan_aob(process_inf.addr, process_inf.size, func,
+            size)?.context("Couldn't find aob")?;
+
+        if let Some(v) = offset {
+            entry_point = ((entry_point as isize) + v) as usize;
+        }
+
+        Ok(Detour::new(entry_point, size_injection, new_function, function_end))
+    }
+}
+
+impl Drop for Detour {
+    fn drop(&mut self) {
+        unsafe {
+            println!("Detour at {:x} was dropped", self.entry_point);
+            write_aob(self.entry_point, &self.f_orig)
+                .expect("Couldn't restore original bytes");
+        }
     }
 }
