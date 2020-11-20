@@ -1,3 +1,37 @@
+/// Macro that creates the MainDLL function. 
+/// This function has a special signature that needed by WinAPI to
+/// create a DLL.
+#[macro_export]
+macro_rules! main_dll {
+    ($func:expr) => {
+        #[no_mangle]
+        #[allow(non_snake_case)]
+        pub extern "system" fn DllMain(
+            lib: winapi::shared::minwindef::HINSTANCE,
+            reason: u32,
+            _: usize,
+        ) -> u32 {
+            unsafe {
+                match reason {
+                    winapi::um::winnt::DLL_PROCESS_ATTACH => {
+                        winapi::um::processthreadsapi::CreateThread(
+                            std::ptr::null_mut(),
+                            0,
+                            Some($func),
+                            lib as winapi::shared::minwindef::LPVOID,
+                            0,
+                            std::ptr::null_mut(),
+                        );
+                    }
+                    _ => (),
+                };
+            }
+
+            return true as u32;
+        }
+    };
+}
+
 /// Macro created by t0mstone
 /// You can check the original source at
 /// https://github.com/T0mstone/tlibs/blob/master/some_macros/src/lib.rs#L23-L29
