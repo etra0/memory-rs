@@ -46,8 +46,8 @@ macro_rules! count_args {
 /// Map winapi error to lib error.
 #[macro_export]
 macro_rules! try_winapi {
-    ($call:tt($($args:expr),*)) => {{
-        let res = $call ($($args),*);
+    ($call:expr) => {{
+        let res = $call;
         if res == 0 {
             let msg = format!("{} failed with error code {}", std::stringify!($call), std::io::Error::last_os_error());
             return Err($crate::error::Error::new($crate::error::ErrorType::WinAPI, msg).into());

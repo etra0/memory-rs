@@ -1,6 +1,9 @@
 use std::ffi::CString;
 use std::io::Error;
+use crate::error::*;
 use winapi::shared::minwindef::HMODULE;
+use anyhow::{Context, Result};
+use crate::try_winapi;
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
@@ -13,35 +16,27 @@ pub struct ProcessInfo {
 impl ProcessInfo {
     /// Create the ProcessInfo. This function can fail in case where
     /// the `GetModuleInformation` fails.
-    pub fn new(name: &str) -> Result<ProcessInfo, String> {
-        let name = CString::new(name).or(Err("String couldn't be allocated"))?;
+    pub fn new(name: &str) -> Result<ProcessInfo> {
+        let name = CString::new(name)?;
 
         let module = unsafe { winapi::um::libloaderapi::GetModuleHandleA(name.as_ptr()) };
 
         let module_addr = module as usize;
 
         let module_size: usize;
-        let status = unsafe {
+        unsafe {
             let process = winapi::um::processthreadsapi::GetCurrentProcess();
             let mut module_info = winapi::um::psapi::MODULEINFO::default();
-            let result = winapi::um::psapi::GetModuleInformation(
+            try_winapi!(winapi::um::psapi::GetModuleInformation(
                 process,
                 module,
                 &mut module_info,
                 std::mem::size_of::<winapi::um::psapi::MODULEINFO>() as u32,
-            );
+            ));
 
             module_size = module_info.SizeOfImage as usize;
-            result
-        };
-
-        if status == 0 {
-            let err_msg = format!(
-                "Couldn't get GetModuleInformation, reason: {:?}",
-                Error::last_os_error()
-            );
-            return Err(err_msg);
         }
+
 
         Ok(ProcessInfo {
             handle: module,
