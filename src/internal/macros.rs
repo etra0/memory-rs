@@ -1,4 +1,4 @@
-/// Macro that creates the MainDLL function. 
+/// Macro that creates the MainDLL function.
 /// This function has a special signature that needed by WinAPI to
 /// create a DLL.
 #[macro_export]
@@ -49,10 +49,14 @@ macro_rules! try_winapi {
     ($call:expr) => {{
         let res = $call;
         if res == 0 {
-            let msg = format!("{} failed with error code {}", std::stringify!($call), std::io::Error::last_os_error());
+            let msg = format!(
+                "{} failed with error code {}",
+                std::stringify!($call),
+                std::io::Error::last_os_error()
+            );
             return Err($crate::error::Error::new($crate::error::ErrorType::WinAPI, msg).into());
         }
-    }}
+    }};
 }
 
 /// Scoped no mangle to avoid repetition

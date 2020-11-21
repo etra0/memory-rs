@@ -1,4 +1,4 @@
-use crate::internal::memory::{hook_function, write_aob, scan_aob};
+use crate::internal::memory::{hook_function, scan_aob, write_aob};
 use crate::internal::process_info::ProcessInfo;
 use anyhow::{Context, Result};
 
@@ -69,14 +69,12 @@ impl Detour {
 impl Drop for Detour {
     fn drop(&mut self) {
         unsafe {
-            write_aob(self.entry_point, &self.f_orig)
-                .expect("Couldn't restore original bytes");
+            write_aob(self.entry_point, &self.f_orig).expect("Couldn't restore original bytes");
         }
     }
 }
 
-
-/// `Injection` is a simple structure that contains an address where 
+/// `Injection` is a simple structure that contains an address where
 /// the instructions to be modified are, and the original bytes with
 /// the new ones. This struct is intended to be injected and removed
 /// easily.
@@ -104,21 +102,23 @@ impl Injection {
         Injection {
             entry_point,
             f_orig,
-            f_rep
+            f_rep,
         }
     }
 
     pub fn new_from_aob<T>(
         proc_inf: &ProcessInfo,
         f_rep: Vec<u8>,
-        aob_tuple: (usize, T)
-        ) -> Result<Injection> where T: Fn(&[u8]) -> bool {
+        aob_tuple: (usize, T),
+    ) -> Result<Injection>
+    where
+        T: Fn(&[u8]) -> bool,
+    {
         let (size, func) = aob_tuple;
-        let entry_point = scan_aob(proc_inf.addr, proc_inf.size, func, size)?
-            .context("Couldn't find aob")?;
+        let entry_point =
+            scan_aob(proc_inf.addr, proc_inf.size, func, size)?.context("Couldn't find aob")?;
         Ok(Injection::new(entry_point, f_rep))
     }
-
 }
 
 impl Inject for Injection {
@@ -146,17 +146,18 @@ impl Drop for Injection {
 /// usually globals.
 pub struct StaticElement {
     addr: usize,
-    original_value: Option<u32>
+    original_value: Option<u32>,
 }
-
 
 impl StaticElement {
     pub fn new(addr: usize) -> StaticElement {
         let original_value = unsafe { Some(*(addr as *mut u32)) };
 
-        StaticElement { addr, original_value }
+        StaticElement {
+            addr,
+            original_value,
+        }
     }
-
 }
 
 impl Inject for StaticElement {
@@ -183,23 +184,20 @@ impl Inject for StaticElement {
     }
 }
 
-
 impl Drop for StaticElement {
     fn drop(&mut self) {
         self.remove_injection();
     }
 }
 
-
-impl<T> Inject for std::vec::Vec<T> where T: Inject {
+impl<T> Inject for std::vec::Vec<T>
+where
+    T: Inject,
+{
     fn inject(&mut self) {
-        self
-            .iter_mut()
-            .for_each(|x| (*x).inject());
+        self.iter_mut().for_each(|x| (*x).inject());
     }
     fn remove_injection(&mut self) {
-        self
-            .iter_mut()
-            .for_each(|x| (*x).remove_injection());
+        self.iter_mut().for_each(|x| (*x).remove_injection());
     }
 }

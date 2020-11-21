@@ -1,9 +1,9 @@
+use crate::error::*;
+use crate::try_winapi;
+use anyhow::{Context, Result};
 use std::ffi::CString;
 use std::io::Error;
-use crate::error::*;
 use winapi::shared::minwindef::HMODULE;
-use anyhow::{Context, Result};
-use crate::try_winapi;
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
@@ -36,7 +36,6 @@ impl ProcessInfo {
 
             module_size = module_info.SizeOfImage as usize;
         }
-
 
         Ok(ProcessInfo {
             handle: module,
