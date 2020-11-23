@@ -13,7 +13,7 @@ pub struct Detour {
 }
 
 impl Detour {
-    fn new(
+    pub fn new(
         entry_point: usize,
         size: usize,
         new_function: usize,
