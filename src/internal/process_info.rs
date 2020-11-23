@@ -1,8 +1,6 @@
-use crate::error::*;
 use crate::try_winapi;
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use std::ffi::CString;
-use std::io::Error;
 use winapi::shared::minwindef::HMODULE;
 
 /// Struct that contains some very basic information of a executable or DLL.

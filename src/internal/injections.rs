@@ -6,10 +6,14 @@ use anyhow::{Context, Result};
 /// The purpose of this struct is that when it goes out of scope,
 /// it automatically removes the modified bytes in order to do a clean
 /// remove of the DLL.
+//TODO: Impl Inject for this struct.
 pub struct Detour {
     pub entry_point: usize,
     /// Original bytes where the entry_point points.
     f_orig: Vec<u8>,
+
+    new_function: usize,
+    function_end: Option<usize>
 }
 
 impl Detour {
@@ -17,7 +21,7 @@ impl Detour {
         entry_point: usize,
         size: usize,
         new_function: usize,
-        function_end: Option<&mut usize>,
+        function_end: Option<usize>,
     ) -> Detour {
         let mut f_orig = vec![];
 
@@ -26,13 +30,11 @@ impl Detour {
             f_orig.extend_from_slice(slice_);
         }
 
-        unsafe {
-            hook_function(entry_point, new_function, function_end, size).unwrap();
-        }
-
         Detour {
             entry_point,
             f_orig,
+            new_function,
+            function_end
         }
     }
 
@@ -42,7 +44,7 @@ impl Detour {
         scan: (usize, T),
         process_inf: &ProcessInfo,
         new_function: usize,
-        function_end: Option<&mut usize>,
+        function_end: Option<usize>,
         size_injection: usize,
         offset: Option<isize>,
     ) -> Result<Detour>
@@ -66,11 +68,29 @@ impl Detour {
     }
 }
 
+impl Inject for Detour {
+    fn inject(&mut self) {
+        unsafe {
+            hook_function(
+                self.entry_point,
+                self.new_function,
+                self.function_end,
+                self.f_orig.len()
+            ).unwrap();
+        }
+    }
+
+    fn remove_injection(&mut self) {
+        unsafe {
+            write_aob(self.entry_point, &self.f_orig)
+                .unwrap();
+        }
+    }
+}
+
 impl Drop for Detour {
     fn drop(&mut self) {
-        unsafe {
-            write_aob(self.entry_point, &self.f_orig).expect("Couldn't restore original bytes");
-        }
+        self.remove_injection();
     }
 }
 
