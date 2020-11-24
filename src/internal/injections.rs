@@ -2,17 +2,29 @@ use crate::internal::memory::{hook_function, scan_aob, write_aob};
 use crate::internal::process_info::ProcessInfo;
 use anyhow::{Context, Result};
 
+/// Trait specifically designed to extend the Vec<T> struct in order
+/// to easily write something like `vec.inject()` when you have a vector
+/// of structs that implements Inject.
+pub trait Inject {
+    fn inject(&mut self);
+    fn remove_injection(&mut self);
+}
+
 /// Struct that contains its entry point and original bytes.
 /// The purpose of this struct is that when it goes out of scope,
 /// it automatically removes the modified bytes in order to do a clean
 /// remove of the DLL.
-//TODO: Impl Inject for this struct.
 pub struct Detour {
+    /// Pointer where the detour will be injected.
     pub entry_point: usize,
     /// Original bytes where the entry_point points.
     f_orig: Vec<u8>,
 
+    /// New function where the detour will redirect.
     new_function: usize,
+
+    /// Optional pointer that will be written the jump back if what you
+    /// inject isn't technically a function (i.e. doesn't return)
     function_end: Option<usize>
 }
 
@@ -107,11 +119,6 @@ pub struct Injection {
     pub f_rep: Vec<u8>,
 }
 
-pub trait Inject {
-    fn inject(&mut self);
-    fn remove_injection(&mut self);
-}
-
 impl Injection {
     pub fn new(entry_point: usize, f_rep: Vec<u8>) -> Injection {
         let aob_size = f_rep.len();
@@ -126,6 +133,15 @@ impl Injection {
         }
     }
 
+    /// Creates a new injection using the `generate_aob_pattern` macro.
+    /// # Example
+    /// ```
+    /// let injection = Injection::new_from_aob(proc_inf, vec![0x90; 4],
+    ///     generate_aob_pattern![0xAA, _, 0xBB]).unwrap();
+    /// // With this we nop the bytes (i.e. we write 0x90) where
+    /// // generate_aob_pattern has a match.
+    /// injection.inject()
+    /// ```
     pub fn new_from_aob<T>(
         proc_inf: &ProcessInfo,
         f_rep: Vec<u8>,
