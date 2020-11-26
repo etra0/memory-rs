@@ -47,7 +47,7 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
 pub unsafe fn hook_function(
     original_function: usize,
     new_function: usize,
-    new_function_end: Option<usize>,
+    new_function_end: Option<&mut usize>,
     len: usize,
 ) -> Result<()> {
     use std::mem::transmute;
@@ -98,12 +98,9 @@ pub unsafe fn hook_function(
     ));
 
     // Inject the jmp back if required
-    let new_function_end = match new_function_end {
-        Some(v) => v as *mut usize,
-        None => return Ok(()),
-    };
-
-    *new_function_end = original_function + len;
+    if let Some(p) = new_function_end {
+        *p = original_function + len;
+    }
 
     Ok(())
 }
