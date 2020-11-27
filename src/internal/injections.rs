@@ -143,11 +143,26 @@ impl Injection {
     /// Creates a new injection using the `generate_aob_pattern` macro.
     /// # Example
     /// ```
-    /// let injection = Injection::new_from_aob(proc_inf, vec![0x90; 4],
-    ///     generate_aob_pattern![0xAA, _, 0xBB]).unwrap();
+    /// # use memory_rs::internal::injections::*;
+    /// # use memory_rs::internal::process_info::ProcessInfo;
+    /// # use memory_rs::generate_aob_pattern;
+    /// # #[allow(non_upper_case_globals)]
+    /// static arr: [u8; 5] = [0xEE, 0xAA, 0xFF, 0xBB, 0xFF];
+    /// # // avoid removal of arr at compilation
+    /// # println!("{:x?}", arr);
+    /// # let proc_inf = ProcessInfo::new(None).unwrap();
+    /// let mut injection = Injection::new_from_aob(&proc_inf, vec![0x90; 3],
+    ///     generate_aob_pattern![0xAA, _, 0xBB, 0xFF]).unwrap();
     /// // With this we nop the bytes (i.e. we write 0x90) where
     /// // generate_aob_pattern has a match.
-    /// injection.inject()
+    /// injection.inject();
+    /// assert_eq!(&arr[1..4], &[0x90, 0x90, 0x90]);
+    ///
+    /// // If we remove the injection (or `injection` gets dropped) the original
+    /// // array should be restored.
+    /// injection.remove_injection();
+    /// assert_eq!(&arr[1..4], &[0xAA, 0xFF, 0xBB]);
+    ///
     /// ```
     pub fn new_from_aob<T>(
         proc_inf: &ProcessInfo,
