@@ -14,10 +14,13 @@ pub struct ProcessInfo {
 impl ProcessInfo {
     /// Create the ProcessInfo. This function can fail in case where
     /// the `GetModuleInformation` fails.
-    pub fn new(name: &str) -> Result<ProcessInfo> {
-        let name = CString::new(name)?;
+    pub fn new(name: Option<&'static str>) -> Result<ProcessInfo> {
+        let name_ = match name {
+            Some(n) => CString::new(n)?.as_ptr(),
+            None => std::ptr::null(),
+        };
 
-        let module = unsafe { winapi::um::libloaderapi::GetModuleHandleA(name.as_ptr()) };
+        let module = unsafe { winapi::um::libloaderapi::GetModuleHandleA(name_) };
 
         let module_addr = module as usize;
 
