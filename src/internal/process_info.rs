@@ -1,5 +1,5 @@
 use crate::try_winapi;
-use anyhow::{Result};
+use anyhow::Result;
 use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
 

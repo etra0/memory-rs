@@ -25,7 +25,7 @@ pub struct Detour {
 
     /// Optional pointer that will be written the jump back if what you
     /// inject isn't technically a function (i.e. doesn't return)
-    function_end: Option<&'static mut usize>
+    function_end: Option<&'static mut usize>,
 }
 
 impl Detour {
@@ -46,7 +46,7 @@ impl Detour {
             entry_point,
             f_orig,
             new_function,
-            function_end
+            function_end,
         }
     }
 
@@ -88,25 +88,21 @@ impl Inject for Detour {
                     self.entry_point,
                     self.new_function,
                     Some(function_end),
-                    self.f_orig.len()
-                ).unwrap();
+                    self.f_orig.len(),
+                )
+                .unwrap();
             }
         } else {
             unsafe {
-                hook_function(
-                    self.entry_point,
-                    self.new_function,
-                    None,
-                    self.f_orig.len()
-                ).unwrap();
+                hook_function(self.entry_point, self.new_function, None, self.f_orig.len())
+                    .unwrap();
             }
         }
     }
 
     fn remove_injection(&mut self) {
         unsafe {
-            write_aob(self.entry_point, &self.f_orig)
-                .unwrap();
+            write_aob(self.entry_point, &self.f_orig).unwrap();
         }
     }
 }
