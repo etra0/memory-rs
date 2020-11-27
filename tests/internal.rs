@@ -1,4 +1,5 @@
 use memory_rs::internal::memory::*;
+use memory_rs::internal::injections::*;
 
 static TO_BE_WRITTEN: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
 static SEARCH_ARRAY: [u8; 10] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0xC0, 0xCA, 0xDA];
@@ -100,9 +101,43 @@ fn test_injection() {
 
     assert_eq!("I'm the original function", res);
 
-    unsafe { hook_function(original_function, new_function, None, 14).unwrap() };
+    let mut det = Detour::new(original_function, 14, new_function, None);
+    det.inject();
 
     let res = dummy_function();
 
     assert_eq!(res, "I'm an imposter!");
+
+    det.remove_injection();
+    
+    let res = dummy_function();
+
+    assert_eq!(res, "I'm the original function");
 }
+
+#[test]
+fn test_drop_injection() {
+    static arr: [u8; 5] = [0xE7, 0x9A, 0x00, 0x9A, 0x9B];
+    
+    {
+	let mut injection = Injection::new(arr.as_ptr() as usize + 1,
+	    vec![0xAA, 0xBB, 0xCC]);
+
+	assert_eq!(&arr, &[0xE7, 0x9A, 0x00, 0x9A, 0x9B]);
+
+	injection.inject();
+
+	assert_eq!(&arr, &[0xE7, 0xAA, 0xBB, 0xCC, 0x9B]);
+    }
+
+    assert_eq!(&arr, &[0xE7, 0x9A, 0x00, 0x9A, 0x9B]);
+
+}
+
+// macro_rules! doctest {
+//     ($x:expr) => {
+//         #[doc = $x]
+//         extern {}
+//     }
+// }
+// doctest!(include_str!("../README.md"));
