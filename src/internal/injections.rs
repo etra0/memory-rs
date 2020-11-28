@@ -82,21 +82,14 @@ impl Detour {
 
 impl Inject for Detour {
     fn inject(&mut self) {
-        if let Some(function_end) = &mut self.function_end {
-            unsafe {
-                hook_function(
-                    self.entry_point,
-                    self.new_function,
-                    Some(function_end),
-                    self.f_orig.len(),
-                )
-                .unwrap();
-            }
-        } else {
-            unsafe {
-                hook_function(self.entry_point, self.new_function, None, self.f_orig.len())
-                    .unwrap();
-            }
+        let function_end = match self.function_end {
+            Some(ref mut x) => Some(&mut **x),
+            None => None,
+        };
+
+        unsafe {
+            hook_function(self.entry_point, self.new_function, function_end,
+                self.f_orig.len()).unwrap();
         }
     }
 
