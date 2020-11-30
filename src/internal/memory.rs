@@ -105,21 +105,8 @@ pub unsafe fn hook_function(
     Ok(())
 }
 
-/// Search for a pattern using the `pattern_function` argument. The
-/// `pattern_function` receives a lambda with an `&[u8]` as argument and
-/// returns true or false if the pattern is matched. You can generate
-/// that function using `generate_aob_pattern!` macro.
-pub fn scan_aob<F>(
-    start_address: usize,
-    len: usize,
-    pattern_function: F,
-    pattern_size: usize,
-) -> Result<Option<usize>>
-where
-    F: Fn(&[u8]) -> bool,
-{
+fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
-
     let mut region_size = 0_usize;
     let size_mem_inf = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
 
@@ -144,6 +131,24 @@ where
         region_size += information.RegionSize as usize;
     }
 
+    Ok(())
+}
+
+/// Search for a pattern using the `pattern_function` argument. The
+/// `pattern_function` receives a lambda with an `&[u8]` as argument and
+/// returns true or false if the pattern is matched. You can generate
+/// that function using `generate_aob_pattern!` macro.
+pub fn scan_aob<F>(
+    start_address: usize,
+    len: usize,
+    pattern_function: F,
+    pattern_size: usize,
+) -> Result<Option<usize>>
+where
+    F: Fn(&[u8]) -> bool
+{
+    check_valid_region(start_address, len)?;
+
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
     let index = data.windows(pattern_size).position(pattern_function);
@@ -152,4 +157,39 @@ where
         Some(addr) => Ok(Some(start_address + addr)),
         None => Ok(None),
     }
+}
+
+/// Search for a pattern using the `pattern_function` argument. The
+/// `pattern_function` receives a lambda with an `&[u8]` as argument and
+/// returns true or false if the pattern is matched. You can generate
+/// that function using `generate_aob_pattern!` macro.
+pub fn scan_aob_all_matches<F>(
+    start_address: usize,
+    len: usize,
+    pattern_function: F,
+    pattern_size: usize,
+) -> Result<Vec<usize>> 
+where
+    F: Fn(&[u8]) -> bool + Copy {
+    check_valid_region(start_address, len)?;
+
+    let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
+    let mut iter = data.windows(pattern_size);
+    let mut matches: Vec<usize> = Vec::new();
+
+    loop {
+        let val = iter.position(pattern_function);
+        if val.is_none() {
+            break;
+        }
+
+        let val = val.unwrap();
+        let last_val = matches.last().copied();
+        match last_val {
+            Some(last_val) => matches.push(val + last_val + 0x1),
+            None => matches.push(val + start_address)
+        };
+    }
+
+    Ok(matches)
 }

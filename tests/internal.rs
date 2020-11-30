@@ -44,6 +44,25 @@ fn test_scan_aob() {
 }
 
 #[test]
+fn test_scan_aob_all_matches() {
+    let p: [u8; 10] = [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC];
+    let arr_len = p.len();
+    let (size, func) = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
+
+    let addr = scan_aob_all_matches(p.as_ptr() as usize, arr_len, func, size)
+	.unwrap();
+
+    // Recreate the original array since the pattern repeats every 3 bytes.
+    let mut v = vec![];
+    for a in addr {
+	let a_ = unsafe { std::slice::from_raw_parts(a as *const u8, 3) };
+	v.extend_from_slice(a_);
+    }
+
+    assert_eq!(&[0xAA, 0xBB, 0xCC, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC], &v[..]);
+}
+
+#[test]
 fn test_scan_aob_not_valid_memory() {
     use memory_rs::error;
 
