@@ -193,3 +193,38 @@ where
 
     Ok(matches)
 }
+
+pub fn scan_aligned_value<T>(
+    start_address: usize,
+    len: usize,
+    value: T
+) -> Result<Vec<usize>> 
+where
+    T: Copy + std::cmp::PartialEq
+{
+    check_valid_region(start_address, len)?;
+
+    let size_type = std::mem::size_of::<T>();
+    let mut matches = vec![];
+
+    let data = unsafe { std::slice::from_raw_parts(start_address as *mut T, len / size_type) };
+    let mut iter = data.iter();
+
+    let match_function = |&x: &T| {x == value};
+
+    loop {
+        let val = iter.position(match_function);
+        if val.is_none() {
+            break;
+        }
+
+        let val = val.unwrap();
+        let last_val = matches.last().copied();
+        match last_val {
+            Some(last_val) => matches.push((val + 0x1)*size_type + last_val),
+            None => matches.push((val*size_type) + start_address)
+        };
+    }
+
+    Ok(matches)
+}
