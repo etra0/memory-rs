@@ -136,6 +136,7 @@ fn test_injection() {
 
 #[test]
 fn test_drop_injection() {
+    #[allow(non_upper_case_globals)]
     static arr: [u8; 5] = [0xE7, 0x9A, 0x00, 0x9A, 0x9B];
     
     {
