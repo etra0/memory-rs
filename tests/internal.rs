@@ -154,6 +154,19 @@ fn test_drop_injection() {
 
 }
 
+#[test]
+fn test_scan_aligned_value() {
+    let vals: [u32; 4] = [0xC0FFEE, 0x1337, 0xB00BA, 0xC0FFEE];
+
+    let result = scan_aligned_value(vals.as_ptr() as *const u32 as usize, 16, 0xC0FFEE_u32)
+	.unwrap();
+
+    assert_eq!(
+	&result,
+	&[(&vals[0]) as *const u32 as usize, (&vals[3]) as *const u32 as usize]
+    );
+}
+
 // macro_rules! doctest {
 //     ($x:expr) => {
 //         #[doc = $x]
