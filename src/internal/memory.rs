@@ -105,6 +105,9 @@ pub unsafe fn hook_function(
     Ok(())
 }
 
+/// This function will use the WinAPI to check if the region to scan is valid.
+/// A region is not valid when it's free or when VirtualQuery returns an
+/// error at the moment of querying that region.
 fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
     let mut region_size = 0_usize;
@@ -159,10 +162,9 @@ where
     }
 }
 
-/// Search for a pattern using the `pattern_function` argument. The
-/// `pattern_function` receives a lambda with an `&[u8]` as argument and
-/// returns true or false if the pattern is matched. You can generate
-/// that function using `generate_aob_pattern!` macro.
+/// Search for all matches over a pattern. This function will always
+/// return a [std::vec::Vec], if it doesn't find anything, it will return
+/// an empty vector.
 pub fn scan_aob_all_matches<F>(
     start_address: usize,
     len: usize,
@@ -194,6 +196,11 @@ where
     Ok(matches)
 }
 
+/// Scan for a value of type  `T` assuming it will be aligned
+/// in respect to its size. The difference with
+/// [memory_rs::internal::memory::scan_aob] is that the one mentioned
+/// searches using a window (i.e. bytes can be not aligned). This function
+/// is way faster because of this (and also because comparisons are different).
 pub fn scan_aligned_value<T>(
     start_address: usize,
     len: usize,
