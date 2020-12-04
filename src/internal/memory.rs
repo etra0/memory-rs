@@ -6,6 +6,9 @@ use winapi::shared::minwindef::LPVOID;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
 use winapi::um::processthreadsapi::{FlushInstructionCache, GetCurrentProcess};
 use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
+use winapi::um::libloaderapi;
+use std::ffi::CStr;
+use std::path::PathBuf;
 
 /// Write an array of bytes to the desired ptr address.
 /// # Safety
@@ -235,3 +238,21 @@ where
 
     Ok(matches)
 }
+
+/// Get DLL's parent path
+pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
+    let mut buf: Vec<i8> = Vec::with_capacity(255);
+
+    try_winapi!(libloaderapi::GetModuleFileNameA(
+        lib as _,
+        buf.as_mut_ptr(),
+        255
+    ));
+    let name = CStr::from_ptr(buf.as_ptr());
+    let name = String::from(name.to_str()?);
+
+    let mut path: PathBuf = name.into();
+    path.pop();
+    Ok(path)
+}
+
