@@ -2,6 +2,7 @@ use crate::try_winapi;
 use anyhow::Result;
 use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
+use crate::error::{Error, ErrorType};
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
@@ -37,6 +38,14 @@ impl ProcessInfo {
             ));
 
             module_size = module_info.SizeOfImage as usize;
+        }
+
+        if module_addr == 0x0 {
+            return Err(Error::new(ErrorType::Internal, "Base address can't be 0".to_string()).into());
+        }
+
+        if module_size == 0x0 {
+            return Err(Error::new(ErrorType::Internal, "Size of the module can't be 0".to_string()).into());
         }
 
         Ok(ProcessInfo {

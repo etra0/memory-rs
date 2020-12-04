@@ -113,6 +113,15 @@ pub unsafe fn hook_function(
 /// error at the moment of querying that region.
 fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
+
+    if start_address == 0x0 {
+        return Err(Error::new(ErrorType::Internal, "start_address can't be 0".into()).into());
+    }
+
+    if len == 0x0 {
+        return Err(Error::new(ErrorType::Internal, "len can't be 0".into()).into());
+    }
+
     let mut region_size = 0_usize;
     let size_mem_inf = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
 
@@ -208,7 +217,7 @@ pub fn scan_aligned_value<T>(
     start_address: usize,
     len: usize,
     value: T
-) -> Result<Vec<usize>> 
+) -> Result<Vec<usize>, Box<dyn std::error::Error>> 
 where
     T: Copy + std::cmp::PartialEq
 {
@@ -216,6 +225,13 @@ where
 
     let size_type = std::mem::size_of::<T>();
     let mut matches = vec![];
+
+    if len / size_type == 0 {
+        return Err(
+            Error::new(ErrorType::Internal, "The space to scan is 0".to_string())
+                .into()
+            );
+    }
 
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut T, len / size_type) };
     let mut iter = data.iter();
