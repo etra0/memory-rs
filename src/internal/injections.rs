@@ -64,8 +64,13 @@ impl Detour {
         T: Fn(&[u8]) -> bool,
     {
         let (size, func) = scan;
-        let mut entry_point = scan_aob(process_inf.addr, process_inf.size, func, size)?
-            .context("Couldn't find aob")?;
+        let mut entry_point = scan_aob(
+            process_inf.region.start_address,
+            process_inf.region.size,
+            func,
+            size,
+        )?
+        .context("Couldn't find aob")?;
 
         if let Some(v) = offset {
             entry_point = ((entry_point as isize) + v) as usize;
@@ -88,8 +93,13 @@ impl Inject for Detour {
         };
 
         unsafe {
-            hook_function(self.entry_point, self.new_function, function_end,
-                self.f_orig.len()).unwrap();
+            hook_function(
+                self.entry_point,
+                self.new_function,
+                function_end,
+                self.f_orig.len(),
+            )
+            .unwrap();
         }
     }
 
@@ -166,8 +176,13 @@ impl Injection {
         T: Fn(&[u8]) -> bool,
     {
         let (size, func) = aob_tuple;
-        let entry_point =
-            scan_aob(proc_inf.addr, proc_inf.size, func, size)?.context("Couldn't find aob")?;
+        let entry_point = scan_aob(
+            proc_inf.region.start_address,
+            proc_inf.region.size,
+            func,
+            size,
+        )?
+        .context("Couldn't find aob")?;
         Ok(Injection::new(entry_point, f_rep))
     }
 }

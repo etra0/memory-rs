@@ -1,5 +1,5 @@
-use memory_rs::internal::memory::*;
 use memory_rs::internal::injections::*;
+use memory_rs::internal::memory::*;
 
 static TO_BE_WRITTEN: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
 static SEARCH_ARRAY: [u8; 10] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0xC0, 0xCA, 0xDA];
@@ -49,17 +49,19 @@ fn test_scan_aob_all_matches() {
     let arr_len = p.len();
     let (size, func) = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
 
-    let addr = scan_aob_all_matches(p.as_ptr() as usize, arr_len, func, size)
-	.unwrap();
+    let addr = scan_aob_all_matches(p.as_ptr() as usize, arr_len, func, size).unwrap();
 
     // Recreate the original array since the pattern repeats every 3 bytes.
     let mut v = vec![];
     for a in addr {
-	let a_ = unsafe { std::slice::from_raw_parts(a as *const u8, 3) };
-	v.extend_from_slice(a_);
+        let a_ = unsafe { std::slice::from_raw_parts(a as *const u8, 3) };
+        v.extend_from_slice(a_);
     }
 
-    assert_eq!(&[0xAA, 0xBB, 0xCC, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC], &v[..]);
+    assert_eq!(
+        &[0xAA, 0xBB, 0xCC, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC],
+        &v[..]
+    );
 }
 
 #[test]
@@ -128,7 +130,7 @@ fn test_injection() {
     assert_eq!(res, "I'm an imposter!");
 
     det.remove_injection();
-    
+
     let res = dummy_function();
 
     assert_eq!(res, "I'm the original function");
@@ -138,32 +140,33 @@ fn test_injection() {
 fn test_drop_injection() {
     #[allow(non_upper_case_globals)]
     static arr: [u8; 5] = [0xE7, 0x9A, 0x00, 0x9A, 0x9B];
-    
+
     {
-	let mut injection = Injection::new(arr.as_ptr() as usize + 1,
-	    vec![0xAA, 0xBB, 0xCC]);
+        let mut injection = Injection::new(arr.as_ptr() as usize + 1, vec![0xAA, 0xBB, 0xCC]);
 
-	assert_eq!(&arr, &[0xE7, 0x9A, 0x00, 0x9A, 0x9B]);
+        assert_eq!(&arr, &[0xE7, 0x9A, 0x00, 0x9A, 0x9B]);
 
-	injection.inject();
+        injection.inject();
 
-	assert_eq!(&arr, &[0xE7, 0xAA, 0xBB, 0xCC, 0x9B]);
+        assert_eq!(&arr, &[0xE7, 0xAA, 0xBB, 0xCC, 0x9B]);
     }
 
     assert_eq!(&arr, &[0xE7, 0x9A, 0x00, 0x9A, 0x9B]);
-
 }
 
 #[test]
 fn test_scan_aligned_value() {
     let vals: [u32; 4] = [0xC0FFEE, 0x1337, 0xB00BA, 0xC0FFEE];
 
-    let result = scan_aligned_value(vals.as_ptr() as *const u32 as usize, 16, 0xC0FFEE_u32)
-	.unwrap();
+    let result =
+        scan_aligned_value(vals.as_ptr() as *const u32 as usize, 16, 0xC0FFEE_u32).unwrap();
 
     assert_eq!(
-	&result,
-	&[(&vals[0]) as *const u32 as usize, (&vals[3]) as *const u32 as usize]
+        &result,
+        &[
+            (&vals[0]) as *const u32 as usize,
+            (&vals[3]) as *const u32 as usize
+        ]
     );
 }
 

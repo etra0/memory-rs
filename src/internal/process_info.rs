@@ -1,15 +1,15 @@
+use crate::error::{Error, ErrorType};
+use crate::internal::memory_region::*;
 use crate::try_winapi;
 use anyhow::Result;
 use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
-use crate::error::{Error, ErrorType};
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
 pub struct ProcessInfo {
     pub handle: HMODULE,
-    pub addr: usize,
-    pub size: usize,
+    pub region: MemoryRegion,
 }
 
 impl ProcessInfo {
@@ -20,8 +20,8 @@ impl ProcessInfo {
             Some(n) => {
                 let name_ = CString::new(n)?;
                 unsafe { winapi::um::libloaderapi::GetModuleHandleA(name_.as_ptr()) }
-            },
-            None => unsafe { winapi::um::libloaderapi::GetModuleHandleA(std::ptr::null()) }
+            }
+            None => unsafe { winapi::um::libloaderapi::GetModuleHandleA(std::ptr::null()) },
         };
 
         let module_addr = module as usize;
@@ -41,17 +41,24 @@ impl ProcessInfo {
         }
 
         if module_addr == 0x0 {
-            return Err(Error::new(ErrorType::Internal, "Base address can't be 0".to_string()).into());
+            return Err(
+                Error::new(ErrorType::Internal, "Base address can't be 0".to_string()).into(),
+            );
         }
 
         if module_size == 0x0 {
-            return Err(Error::new(ErrorType::Internal, "Size of the module can't be 0".to_string()).into());
+            return Err(Error::new(
+                ErrorType::Internal,
+                "Size of the module can't be 0".to_string(),
+            )
+            .into());
         }
+
+        let region = MemoryRegion::new(module_addr, module_size, true);
 
         Ok(ProcessInfo {
             handle: module,
-            addr: module_addr,
-            size: module_size,
+            region,
         })
     }
 }

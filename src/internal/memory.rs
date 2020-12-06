@@ -1,14 +1,14 @@
 use crate::error::{Error, ErrorType};
 use crate::try_winapi;
 use anyhow::{Context, Result};
+use std::ffi::CStr;
+use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
+use winapi::um::libloaderapi;
 use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
 use winapi::um::processthreadsapi::{FlushInstructionCache, GetCurrentProcess};
 use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
-use winapi::um::libloaderapi;
-use std::ffi::CStr;
-use std::path::PathBuf;
 
 /// Write an array of bytes to the desired ptr address.
 /// # Safety
@@ -111,7 +111,7 @@ pub unsafe fn hook_function(
 /// This function will use the WinAPI to check if the region to scan is valid.
 /// A region is not valid when it's free or when VirtualQuery returns an
 /// error at the moment of querying that region.
-fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
+pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
 
     if start_address == 0x0 {
@@ -160,7 +160,7 @@ pub fn scan_aob<F>(
     pattern_size: usize,
 ) -> Result<Option<usize>>
 where
-    F: Fn(&[u8]) -> bool
+    F: Fn(&[u8]) -> bool,
 {
     check_valid_region(start_address, len)?;
 
@@ -182,9 +182,10 @@ pub fn scan_aob_all_matches<F>(
     len: usize,
     pattern_function: F,
     pattern_size: usize,
-) -> Result<Vec<usize>> 
+) -> Result<Vec<usize>>
 where
-    F: Fn(&[u8]) -> bool + Copy {
+    F: Fn(&[u8]) -> bool + Copy,
+{
     check_valid_region(start_address, len)?;
 
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
@@ -201,7 +202,7 @@ where
         let last_val = matches.last().copied();
         match last_val {
             Some(last_val) => matches.push(val + last_val + 0x1),
-            None => matches.push(val + start_address)
+            None => matches.push(val + start_address),
         };
     }
 
@@ -216,10 +217,10 @@ where
 pub fn scan_aligned_value<T>(
     start_address: usize,
     len: usize,
-    value: T
-) -> Result<Vec<usize>, Box<dyn std::error::Error>> 
+    value: T,
+) -> Result<Vec<usize>, Box<dyn std::error::Error>>
 where
-    T: Copy + std::cmp::PartialEq
+    T: Copy + std::cmp::PartialEq,
 {
     check_valid_region(start_address, len)?;
 
@@ -227,16 +228,13 @@ where
     let mut matches = vec![];
 
     if len / size_type == 0 {
-        return Err(
-            Error::new(ErrorType::Internal, "The space to scan is 0".to_string())
-                .into()
-            );
+        return Err(Error::new(ErrorType::Internal, "The space to scan is 0".to_string()).into());
     }
 
     let data = unsafe { std::slice::from_raw_parts(start_address as *mut T, len / size_type) };
     let mut iter = data.iter();
 
-    let match_function = |&x: &T| {x == value};
+    let match_function = |&x: &T| x == value;
 
     loop {
         let val = iter.position(match_function);
@@ -247,8 +245,8 @@ where
         let val = val.unwrap();
         let last_val = matches.last().copied();
         match last_val {
-            Some(last_val) => matches.push((val + 0x1)*size_type + last_val),
-            None => matches.push((val*size_type) + start_address)
+            Some(last_val) => matches.push((val + 0x1) * size_type + last_val),
+            None => matches.push((val * size_type) + start_address),
         };
     }
 
@@ -271,4 +269,3 @@ pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
     path.pop();
     Ok(path)
 }
-
