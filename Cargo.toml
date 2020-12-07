@@ -7,3 +7,7 @@ edition = "2018"
 [dependencies]
 winapi = { version = "0.3", features = ["winuser", "tlhelp32", "handleapi", "impl-default", "memoryapi", "processthreadsapi", "psapi", "libloaderapi"] }
 anyhow = "1.0.34"
+
+[features]
+default = ["impl-drop"]
+impl-drop = []

@@ -110,6 +110,7 @@ impl Inject for Detour {
     }
 }
 
+#[cfg(feature = "impl-drop")]
 impl Drop for Detour {
     fn drop(&mut self) {
         self.remove_injection();
@@ -201,6 +202,7 @@ impl Inject for Injection {
     }
 }
 
+#[cfg(feature = "impl-drop")]
 impl Drop for Injection {
     fn drop(&mut self) {
         self.remove_injection();
@@ -249,6 +251,7 @@ impl Inject for StaticElement {
     }
 }
 
+#[cfg(feature = "impl-drop")]
 impl Drop for StaticElement {
     fn drop(&mut self) {
         self.remove_injection();
