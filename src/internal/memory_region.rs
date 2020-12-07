@@ -10,12 +10,17 @@ pub struct MemoryRegion {
 }
 
 impl MemoryRegion {
-    pub fn new(start_address: usize, size: usize, is_safe: bool) -> Self {
-        Self {
+    pub fn new(start_address: usize, size: usize, is_safe: bool) -> Result<Self> {
+        let memory_region = Self {
             start_address,
             size,
             is_safe,
-        }
+        };
+
+        // Do at least one check if the memory is safe
+        memory_region.check_valid_region()?;
+
+        Ok(memory_region)
     }
 
     fn check_valid_region(&self) -> Result<()> {

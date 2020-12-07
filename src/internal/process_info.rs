@@ -54,7 +54,7 @@ impl ProcessInfo {
             .into());
         }
 
-        let region = MemoryRegion::new(module_addr, module_size, true);
+        let region = MemoryRegion::new(module_addr, module_size, true)?;
 
         Ok(ProcessInfo {
             handle: module,
