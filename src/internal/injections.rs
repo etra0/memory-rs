@@ -127,12 +127,12 @@ pub struct Injection {
     /// Original bytes
     pub f_orig: Vec<u8>,
     /// Bytes to be injected
-    pub f_rep: Vec<u8>,
+    pub f_new: Vec<u8>,
 }
 
 impl Injection {
-    pub fn new(entry_point: usize, f_rep: Vec<u8>) -> Injection {
-        let aob_size = f_rep.len();
+    pub fn new(entry_point: usize, f_new: Vec<u8>) -> Injection {
+        let aob_size = f_new.len();
         let slice = unsafe { std::slice::from_raw_parts(entry_point as *const u8, aob_size) };
         let mut f_orig = Vec::new();
         f_orig.extend_from_slice(slice);
@@ -140,7 +140,7 @@ impl Injection {
         Injection {
             entry_point,
             f_orig,
-            f_rep,
+            f_new
         }
     }
 
@@ -170,7 +170,7 @@ impl Injection {
     /// ```
     pub fn new_from_aob<T>(
         proc_inf: &ProcessInfo,
-        f_rep: Vec<u8>,
+        f_new: Vec<u8>,
         aob_tuple: (usize, T),
     ) -> Result<Injection>
     where
@@ -184,14 +184,14 @@ impl Injection {
             size,
         )?
         .context("Couldn't find aob")?;
-        Ok(Injection::new(entry_point, f_rep))
+        Ok(Injection::new(entry_point, f_new))
     }
 }
 
 impl Inject for Injection {
     fn inject(&mut self) {
         unsafe {
-            write_aob(self.entry_point, &(self.f_rep)).unwrap();
+            write_aob(self.entry_point, &(self.f_new)).unwrap();
         }
     }
 
