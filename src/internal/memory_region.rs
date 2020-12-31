@@ -10,7 +10,11 @@ pub struct MemoryRegion {
 }
 
 impl MemoryRegion {
-    pub fn new(start_address: usize, size: usize, is_safe: bool) -> Result<Self> {
+    pub fn new(
+        start_address: usize,
+        size: usize,
+        is_safe: bool,
+    ) -> Result<Self> {
         let memory_region = Self {
             start_address,
             size,
@@ -31,13 +35,19 @@ impl MemoryRegion {
         Ok(())
     }
 
-    pub fn scan_aob<F>(&self, pattern_function: F, pattern_size: usize) -> Result<Option<usize>>
+    pub fn scan_aob<F>(
+        &self,
+        pattern_function: F,
+        pattern_size: usize,
+    ) -> Result<Option<usize>>
     where
         F: Fn(&[u8]) -> bool,
     {
         self.check_valid_region()?;
 
-        let data = unsafe { std::slice::from_raw_parts(self.start_address as *mut u8, self.size) };
+        let data = unsafe {
+            std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
+        };
         let index = data.windows(pattern_size).position(pattern_function);
 
         match index {
@@ -55,7 +65,9 @@ impl MemoryRegion {
         F: Fn(&[u8]) -> bool + Copy,
     {
         self.check_valid_region()?;
-        let data = unsafe { std::slice::from_raw_parts(self.start_address as *mut u8, self.size) };
+        let data = unsafe {
+            std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
+        };
         let mut iter = data.windows(pattern_size);
         let mut matches = Vec::new();
 
@@ -92,7 +104,10 @@ impl MemoryRegion {
         }
 
         let data = unsafe {
-            std::slice::from_raw_parts(self.start_address as *mut T, self.size / size_type)
+            std::slice::from_raw_parts(
+                self.start_address as *mut T,
+                self.size / size_type,
+            )
         };
         let mut iter = data.iter();
 
@@ -100,7 +115,9 @@ impl MemoryRegion {
 
         while let Some(val) = iter.position(match_function) {
             match matches.last() {
-                Some(&last_val) => matches.push((val + 0x1) * size_type + last_val),
+                Some(&last_val) => {
+                    matches.push((val + 0x1) * size_type + last_val)
+                }
                 None => matches.push((val * size_type) + self.start_address),
             };
         }

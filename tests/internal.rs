@@ -1,8 +1,10 @@
 use memory_rs::internal::injections::*;
 use memory_rs::internal::memory::*;
 
-static TO_BE_WRITTEN: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
-static SEARCH_ARRAY: [u8; 10] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0xC0, 0xCA, 0xDA];
+static TO_BE_WRITTEN: [u8; 8] =
+    [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
+static SEARCH_ARRAY: [u8; 10] =
+    [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0xC0, 0xCA, 0xDA];
 
 #[test]
 fn test_write_aob() {
@@ -11,7 +13,8 @@ fn test_write_aob() {
 
     unsafe { write_aob(pointer, &new_array).unwrap() };
 
-    let result_array: [u8; 8] = [0xAA, 0xBB, 0xCC, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
+    let result_array: [u8; 8] =
+        [0xAA, 0xBB, 0xCC, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
 
     let equality = TO_BE_WRITTEN.iter().eq(result_array.iter());
 
@@ -45,11 +48,13 @@ fn test_scan_aob() {
 
 #[test]
 fn test_scan_aob_all_matches() {
-    let p: [u8; 10] = [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC];
+    let p: [u8; 10] =
+        [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC];
     let arr_len = p.len();
     let (size, func) = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
 
-    let addr = scan_aob_all_matches(p.as_ptr() as usize, arr_len, func, size).unwrap();
+    let addr =
+        scan_aob_all_matches(p.as_ptr() as usize, arr_len, func, size).unwrap();
 
     // Recreate the original array since the pattern repeats every 3 bytes.
     let mut v = vec![];
@@ -142,7 +147,8 @@ fn test_drop_injection() {
     static arr: [u8; 5] = [0xE7, 0x9A, 0x00, 0x9A, 0x9B];
 
     {
-        let mut injection = Injection::new(arr.as_ptr() as usize + 1, vec![0xAA, 0xBB, 0xCC]);
+        let mut injection =
+            Injection::new(arr.as_ptr() as usize + 1, vec![0xAA, 0xBB, 0xCC]);
 
         assert_eq!(&arr, &[0xE7, 0x9A, 0x00, 0x9A, 0x9B]);
 
@@ -158,8 +164,12 @@ fn test_drop_injection() {
 fn test_scan_aligned_value() {
     let vals: [u32; 4] = [0xC0FFEE, 0x1337, 0xB00BA, 0xC0FFEE];
 
-    let result =
-        scan_aligned_value(vals.as_ptr() as *const u32 as usize, 16, 0xC0FFEE_u32).unwrap();
+    let result = scan_aligned_value(
+        vals.as_ptr() as *const u32 as usize,
+        16,
+        0xC0FFEE_u32,
+    )
+    .unwrap();
 
     assert_eq!(
         &result,

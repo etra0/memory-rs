@@ -4,6 +4,7 @@ use crate::try_winapi;
 use anyhow::Result;
 use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
+use winapi::um::{libloaderapi::GetModuleHandleA, processthreadsapi::GetCurrentProcess, psapi::GetModuleInformation};
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
@@ -19,18 +20,22 @@ impl ProcessInfo {
         let module = match name {
             Some(n) => {
                 let name_ = CString::new(n)?;
-                unsafe { winapi::um::libloaderapi::GetModuleHandleA(name_.as_ptr()) }
+                unsafe {
+                    GetModuleHandleA(name_.as_ptr())
+                }
             }
-            None => unsafe { winapi::um::libloaderapi::GetModuleHandleA(std::ptr::null()) },
+            None => unsafe {
+                GetModuleHandleA(std::ptr::null())
+            },
         };
 
         let module_addr = module as usize;
 
         let module_size: usize;
         unsafe {
-            let process = winapi::um::processthreadsapi::GetCurrentProcess();
+            let process = GetCurrentProcess();
             let mut module_info = winapi::um::psapi::MODULEINFO::default();
-            try_winapi!(winapi::um::psapi::GetModuleInformation(
+            try_winapi!(GetModuleInformation(
                 process,
                 module,
                 &mut module_info,
@@ -41,9 +46,11 @@ impl ProcessInfo {
         }
 
         if module_addr == 0x0 {
-            return Err(
-                Error::new(ErrorType::Internal, "Base address can't be 0".to_string()).into(),
-            );
+            return Err(Error::new(
+                ErrorType::Internal,
+                "Base address can't be 0".to_string(),
+            )
+            .into());
         }
 
         if module_size == 0x0 {
