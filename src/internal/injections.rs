@@ -14,6 +14,7 @@ pub trait Inject {
 /// The purpose of this struct is that when it goes out of scope,
 /// it automatically removes the modified bytes in order to do a clean
 /// remove of the DLL.
+#[derive(Debug)]
 pub struct Detour {
     /// Pointer where the detour will be injected.
     pub entry_point: usize,
@@ -38,7 +39,8 @@ impl Detour {
         let mut f_orig = vec![];
 
         unsafe {
-            let slice_ = std::slice::from_raw_parts(entry_point as *mut u8, size);
+            let slice_ =
+                std::slice::from_raw_parts(entry_point as *mut u8, size);
             f_orig.extend_from_slice(slice_);
         }
 
@@ -121,6 +123,7 @@ impl Drop for Detour {
 /// the instructions to be modified are, and the original bytes with
 /// the new ones. This struct is intended to be injected and removed
 /// easily.
+#[derive(Debug)]
 pub struct Injection {
     /// Entry point relative to the executable
     pub entry_point: usize,
@@ -133,14 +136,16 @@ pub struct Injection {
 impl Injection {
     pub fn new(entry_point: usize, f_new: Vec<u8>) -> Injection {
         let aob_size = f_new.len();
-        let slice = unsafe { std::slice::from_raw_parts(entry_point as *const u8, aob_size) };
+        let slice = unsafe {
+            std::slice::from_raw_parts(entry_point as *const u8, aob_size)
+        };
         let mut f_orig = Vec::new();
         f_orig.extend_from_slice(slice);
 
         Injection {
             entry_point,
             f_orig,
-            f_new
+            f_new,
         }
     }
 

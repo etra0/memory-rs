@@ -71,7 +71,8 @@ pub unsafe fn hook_function(
     ));
 
     let nops = vec![0x90; len];
-    write_aob(original_function, &nops).with_context(|| "Couldn't nop original bytes")?;
+    write_aob(original_function, &nops)
+        .with_context(|| "Couldn't nop original bytes")?;
 
     // Inject the jmp to the original function
     // address as an AoB
@@ -88,8 +89,9 @@ pub unsafe fn hook_function(
         v
     };
 
-    write_aob(original_function, &injection)
-        .with_context(|| "Couldn't write the injection to the original function")?;
+    write_aob(original_function, &injection).with_context(|| {
+        "Couldn't write the injection to the original function"
+    })?;
 
     FlushInstructionCache(ph, original_function as LPVOID, injection.len());
 
@@ -115,11 +117,17 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
 
     if start_address == 0x0 {
-        return Err(Error::new(ErrorType::Internal, "start_address can't be 0".into()).into());
+        return Err(Error::new(
+            ErrorType::Internal,
+            "start_address can't be 0".into(),
+        )
+        .into());
     }
 
     if len == 0x0 {
-        return Err(Error::new(ErrorType::Internal, "len can't be 0".into()).into());
+        return Err(
+            Error::new(ErrorType::Internal, "len can't be 0".into()).into()
+        );
     }
 
     let mut region_size = 0_usize;
@@ -164,7 +172,8 @@ where
 {
     check_valid_region(start_address, len)?;
 
-    let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
+    let data =
+        unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
     let index = data.windows(pattern_size).position(pattern_function);
 
@@ -188,7 +197,8 @@ where
 {
     check_valid_region(start_address, len)?;
 
-    let data = unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
+    let data =
+        unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
     let mut iter = data.windows(pattern_size);
     let mut matches: Vec<usize> = Vec::new();
 
@@ -228,10 +238,16 @@ where
     let mut matches = vec![];
 
     if len / size_type == 0 {
-        return Err(Error::new(ErrorType::Internal, "The space to scan is 0".to_string()).into());
+        return Err(Error::new(
+            ErrorType::Internal,
+            "The space to scan is 0".to_string(),
+        )
+        .into());
     }
 
-    let data = unsafe { std::slice::from_raw_parts(start_address as *mut T, len / size_type) };
+    let data = unsafe {
+        std::slice::from_raw_parts(start_address as *mut T, len / size_type)
+    };
     let mut iter = data.iter();
 
     let match_function = |&x: &T| x == value;

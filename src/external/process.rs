@@ -71,14 +71,19 @@ impl Process {
             self.module_base_address + ptr
         };
 
-        let output: Vec<u8> = crate::external::memory::get_aob(self.h_process, addr, n);
+        let output: Vec<u8> =
+            crate::external::memory::get_aob(self.h_process, addr, n);
 
         output
     }
 
     // TODO: Move this function out of process because it should be in
     // memory/mod.rs.
-    pub fn read_value<OutputType>(&self, ptr: DWORD_PTR, absolute: bool) -> OutputType {
+    pub fn read_value<OutputType>(
+        &self,
+        ptr: DWORD_PTR,
+        absolute: bool,
+    ) -> OutputType {
         let addr = if absolute {
             ptr
         } else {
@@ -103,7 +108,12 @@ impl Process {
         buffer
     }
 
-    pub fn write_value<InputType>(&self, ptr: DWORD_PTR, output: InputType, absolute: bool) {
+    pub fn write_value<InputType>(
+        &self,
+        ptr: DWORD_PTR,
+        output: InputType,
+        absolute: bool,
+    ) {
         let addr = if absolute {
             ptr
         } else {
@@ -188,7 +198,9 @@ impl Process {
 
 pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
     let mut process_id: DWORD = 0;
-    let h_snap = unsafe { tlhelp32::CreateToolhelp32Snapshot(tlhelp32::TH32CS_SNAPPROCESS, 0) };
+    let h_snap = unsafe {
+        tlhelp32::CreateToolhelp32Snapshot(tlhelp32::TH32CS_SNAPPROCESS, 0)
+    };
 
     if h_snap == handleapi::INVALID_HANDLE_VALUE {
         return Err(Error::last_os_error());
@@ -200,9 +212,10 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
     unsafe {
         if tlhelp32::Process32First(h_snap, &mut process_entry) == 1 {
             process_id = loop {
-                let current_name = CStr::from_ptr(process_entry.szExeFile.as_ptr())
-                    .to_str()
-                    .expect("No string found");
+                let current_name =
+                    CStr::from_ptr(process_entry.szExeFile.as_ptr())
+                        .to_str()
+                        .expect("No string found");
 
                 if current_name == process_name {
                     break process_entry.th32ProcessID;
@@ -224,7 +237,10 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
     Ok(process_id)
 }
 
-pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR, Error> {
+pub fn get_module_base(
+    process_id: DWORD,
+    module_name: &str,
+) -> Result<DWORD_PTR, Error> {
     let mut module_base_address: DWORD_PTR = 0x0;
     let h_snap = unsafe {
         tlhelp32::CreateToolhelp32Snapshot(
@@ -243,9 +259,10 @@ pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR
     unsafe {
         if tlhelp32::Module32First(h_snap, &mut module_entry) != 0 {
             module_base_address = loop {
-                let current_name = CStr::from_ptr(module_entry.szModule.as_ptr())
-                    .to_str()
-                    .expect("No string found");
+                let current_name =
+                    CStr::from_ptr(module_entry.szModule.as_ptr())
+                        .to_str()
+                        .expect("No string found");
 
                 if current_name == module_name {
                     break module_entry.modBaseAddr as DWORD_PTR;
