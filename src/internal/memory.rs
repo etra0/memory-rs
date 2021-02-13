@@ -53,8 +53,6 @@ pub unsafe fn hook_function(
     new_function_end: Option<&mut usize>,
     len: usize,
 ) -> Result<()> {
-    use std::mem::transmute;
-
     assert!(len >= 12, "Not enough space to inject the shellcode");
 
     let ph = GetCurrentProcess();
@@ -76,7 +74,7 @@ pub unsafe fn hook_function(
 
     // Inject the jmp to the original function
     // address as an AoB
-    let aob: [u8; 8] = transmute(new_function.to_le());
+    let aob: [u8; std::mem::size_of::<usize>()] = new_function.to_le_bytes();
 
     let injection = if len < 14 {
         let mut v = vec![0x48, 0xb8];
@@ -84,7 +82,13 @@ pub unsafe fn hook_function(
         v.extend_from_slice(&[0xff, 0xe0]);
         v
     } else {
-        let mut v = vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00];
+        let mut v = if cfg!(target_arch = "x86_64") {
+            vec![0xff, 0x25, 0x00, 0x00, 0x00, 0x00]
+        } else {
+            let mut v = vec![0xFF, 0x25];
+            v.extend_from_slice(&(original_function + 6).to_le_bytes());
+            v
+        };
         v.extend_from_slice(&aob);
         v
     };
