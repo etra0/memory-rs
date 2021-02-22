@@ -149,7 +149,7 @@ pub unsafe fn inject_shellcode(
         shellcode_space = VirtualAllocEx(
             h_process,
             current_address as LPVOID,
-            0x1000 as usize,
+            0x1000_usize,
             MEM_RESERVE | MEM_COMMIT,
             PAGE_EXECUTE_READWRITE,
         ) as DWORD_PTR;

@@ -1,3 +1,4 @@
+#![allow(non_upper_case_globals)]
 use memory_rs::internal::injections::*;
 use memory_rs::internal::memory::*;
 
@@ -143,7 +144,6 @@ fn test_injection() {
 
 #[test]
 fn test_drop_injection() {
-    #[allow(non_upper_case_globals)]
     static arr: [u8; 5] = [0xE7, 0x9A, 0x00, 0x9A, 0x9B];
 
     {
@@ -186,20 +186,24 @@ fn test_hashmap() {
     static arr: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
 
     let mut hash = HashMap::new();
-    hash.insert("first_index", Injection::new(arr.as_ptr() as usize, vec![0xFF]));
+    hash.insert(
+        "first_index",
+        Injection::new(arr.as_ptr() as usize, vec![0xFF]),
+    );
 
     unsafe {
-    hash.insert("second_index", Injection::new(arr.as_ptr().offset(1) as usize, vec![0xFA]));
+        hash.insert(
+            "second_index",
+            Injection::new(arr.as_ptr().offset(1) as usize, vec![0xFA]),
+        );
     }
     hash.inject();
 
-    assert_eq!(&arr[..2], &[0xFF, 0xFA]);       
+    assert_eq!(&arr[..2], &[0xFF, 0xFA]);
 
     hash.get_mut("first_index").unwrap().remove_injection();
 
     assert_eq!(&arr[..2], &[0xAA, 0xFA]);
-
-
 }
 
 // macro_rules! doctest {

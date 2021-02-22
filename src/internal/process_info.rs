@@ -4,7 +4,10 @@ use crate::try_winapi;
 use anyhow::Result;
 use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
-use winapi::um::{libloaderapi::GetModuleHandleA, processthreadsapi::GetCurrentProcess, psapi::GetModuleInformation};
+use winapi::um::{
+    libloaderapi::GetModuleHandleA, processthreadsapi::GetCurrentProcess,
+    psapi::GetModuleInformation,
+};
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
@@ -20,13 +23,9 @@ impl ProcessInfo {
         let module = match name {
             Some(n) => {
                 let name_ = CString::new(n)?;
-                unsafe {
-                    GetModuleHandleA(name_.as_ptr())
-                }
+                unsafe { GetModuleHandleA(name_.as_ptr()) }
             }
-            None => unsafe {
-                GetModuleHandleA(std::ptr::null())
-            },
+            None => unsafe { GetModuleHandleA(std::ptr::null()) },
         };
 
         let module_addr = module as usize;

@@ -274,6 +274,9 @@ where
 }
 
 /// Get DLL's parent path
+/// # Safety
+/// This function can fail on the
+/// GetModuleFileNameA, everything else is unsafe
 pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
     let mut buf: Vec<i8> = Vec::with_capacity(255);
 
