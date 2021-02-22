@@ -263,14 +263,24 @@ impl Drop for StaticElement {
     }
 }
 
-impl<T> Inject for std::vec::Vec<T>
-where
-    T: Inject,
+impl<I: Inject> Inject for std::vec::Vec<I>
 {
     fn inject(&mut self) {
         self.iter_mut().for_each(|x| (*x).inject());
     }
     fn remove_injection(&mut self) {
         self.iter_mut().for_each(|x| (*x).remove_injection());
+    }
+}
+
+impl<I: Inject, H> Inject for std::collections::HashMap<H, I> {
+    fn inject(&mut self) {
+        self.values_mut()
+            .for_each(|x| (*x).inject());
+    }
+
+    fn remove_injection(&mut self) {
+        self.values_mut()
+            .for_each(|x| (*x).remove_injection());
     }
 }

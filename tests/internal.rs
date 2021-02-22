@@ -180,6 +180,28 @@ fn test_scan_aligned_value() {
     );
 }
 
+#[test]
+fn test_hashmap() {
+    use std::collections::HashMap;
+    static arr: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
+
+    let mut hash = HashMap::new();
+    hash.insert("first_index", Injection::new(arr.as_ptr() as usize, vec![0xFF]));
+
+    unsafe {
+    hash.insert("second_index", Injection::new(arr.as_ptr().offset(1) as usize, vec![0xFA]));
+    }
+    hash.inject();
+
+    assert_eq!(&arr[..2], &[0xFF, 0xFA]);       
+
+    hash.get_mut("first_index").unwrap().remove_injection();
+
+    assert_eq!(&arr[..2], &[0xAA, 0xFA]);
+
+
+}
+
 // macro_rules! doctest {
 //     ($x:expr) => {
 //         #[doc = $x]
