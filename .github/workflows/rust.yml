@@ -1,0 +1,29 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        architecture: [x86_64-pc-windows-msvc, i686-pc-windows-msvc]
+
+    name: Test on ${{ matrix.architecture }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Add ${{ matrix.architecture }} target
+      run: rustup target add ${{ matrix.architecture }}
+    - name: Build
+      run: cargo build --target=${{ matrix.architecture }} --verbose
+    - name: Run tests
+      run: cargo test --target=${{ matrix.architecture }} --verbose
