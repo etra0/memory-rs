@@ -1,3 +1,4 @@
+#![allow(non_upper_case_globals)]
 use memory_rs::internal::injections::*;
 use memory_rs::internal::memory::*;
 
@@ -73,7 +74,7 @@ fn test_scan_aob_all_matches() {
 fn test_scan_aob_not_valid_memory() {
     use memory_rs::error;
 
-    let p = 0x1234_5678;
+    let p = 0x12345678;
     let len = 0xFFFF;
     let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
 
@@ -93,7 +94,7 @@ fn test_scan_aob_out_of_bounds() {
     use memory_rs::error;
 
     let p = &SEARCH_ARRAY as *const u8 as usize;
-    let len = 0xFFFFFFFFFF;
+    let len = 0xFFFFF;
     let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
 
     let addr = scan_aob(p, len, func, size);
@@ -143,7 +144,6 @@ fn test_injection() {
 
 #[test]
 fn test_drop_injection() {
-    #[allow(non_upper_case_globals)]
     static arr: [u8; 5] = [0xE7, 0x9A, 0x00, 0x9A, 0x9B];
 
     {
@@ -178,6 +178,32 @@ fn test_scan_aligned_value() {
             (&vals[3]) as *const u32 as usize
         ]
     );
+}
+
+#[test]
+fn test_hashmap() {
+    use std::collections::HashMap;
+    static arr: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
+
+    let mut hash = HashMap::new();
+    hash.insert(
+        "first_index",
+        Injection::new(arr.as_ptr() as usize, vec![0xFF]),
+    );
+
+    unsafe {
+        hash.insert(
+            "second_index",
+            Injection::new(arr.as_ptr().offset(1) as usize, vec![0xFA]),
+        );
+    }
+    hash.inject();
+
+    assert_eq!(&arr[..2], &[0xFF, 0xFA]);
+
+    hash.get_mut("first_index").unwrap().remove_injection();
+
+    assert_eq!(&arr[..2], &[0xAA, 0xFA]);
 }
 
 // macro_rules! doctest {

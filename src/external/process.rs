@@ -206,8 +206,10 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
         return Err(Error::last_os_error());
     }
 
-    let mut process_entry = tlhelp32::PROCESSENTRY32::default();
-    process_entry.dwSize = mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32;
+    let mut process_entry = tlhelp32::PROCESSENTRY32 {
+        dwSize: mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32,
+        ..Default::default()
+    };
 
     unsafe {
         if tlhelp32::Process32First(h_snap, &mut process_entry) == 1 {
@@ -253,8 +255,10 @@ pub fn get_module_base(
         return Err(Error::last_os_error());
     }
 
-    let mut module_entry = tlhelp32::MODULEENTRY32::default();
-    module_entry.dwSize = mem::size_of::<tlhelp32::MODULEENTRY32>() as u32;
+    let mut module_entry = tlhelp32::MODULEENTRY32 {
+        dwSize: mem::size_of::<tlhelp32::MODULEENTRY32>() as u32,
+        ..Default::default()
+    };
 
     unsafe {
         if tlhelp32::Module32First(h_snap, &mut module_entry) != 0 {
