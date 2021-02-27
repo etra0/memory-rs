@@ -10,31 +10,59 @@ use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
 use winapi::um::processthreadsapi::{FlushInstructionCache, GetCurrentProcess};
 use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 
+pub struct MemProtect {
+    addr: usize,
+    size: usize,
+    prot: u32
+}
+
+/// Scoped VirtualProtect.
+/// # Safety
+/// The only unsafe bit is the VirtualProtect, which according to msdn 
+/// it shouldn't have undefined behavior, so we wrap that function with an
+/// `try_winapi!` macro.
+impl MemProtect {
+    pub fn new(addr: usize, size: usize, prot: Option<u32>) -> Result<Self> {
+        let new_prot = match prot {
+            Some(p) => p,
+            None => PAGE_EXECUTE_READWRITE
+        };
+
+        let mut old_prot = 0u32;
+
+        unsafe {
+        try_winapi!(VirtualProtect(
+            addr as LPVOID,
+            size,
+            new_prot,
+            &mut old_prot
+        ));
+    }
+
+        Ok(Self { addr, size, prot: old_prot })
+    }
+}
+
+impl Drop for MemProtect {
+    fn drop(&mut self) {
+        let mut _prot = 0;
+        unsafe {
+        VirtualProtect(self.addr as _, self.size, self.prot, &mut _prot);
+        }
+    }
+}
+
 /// Write an array of bytes to the desired ptr address.
 /// # Safety
 /// This function can cause the target program to crash due to
 /// incorrect writing, or it could simply make crash the software in case
 /// the virtual protect doesn't succeed.
 pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
-    let mut protection_bytes: u32 = 0x0;
     let size = source.len();
 
-    try_winapi!(VirtualProtect(
-        ptr as LPVOID,
-        size,
-        PAGE_EXECUTE_READWRITE,
-        &mut protection_bytes
-    ));
+    let _mp = MemProtect::new(ptr, size, None)?;
 
     copy_nonoverlapping(source.as_ptr(), ptr as *mut u8, size);
-
-    let mut ignored_bytes: u32 = 0x0;
-    try_winapi!(VirtualProtect(
-        ptr as LPVOID,
-        size,
-        protection_bytes,
-        &mut ignored_bytes
-    ));
 
     let ph = GetCurrentProcess();
     FlushInstructionCache(ph, ptr as LPVOID, size);
@@ -59,16 +87,8 @@ pub unsafe fn hook_function(
 
     let ph = GetCurrentProcess();
 
-    let mut o_function_prot: u32 = 0x0;
-    let mut ignored_prot: u32 = 0x0;
-
     // Unprotect zone we'll write
-    try_winapi!(VirtualProtect(
-        original_function as LPVOID,
-        len,
-        PAGE_EXECUTE_READWRITE,
-        &mut o_function_prot
-    ));
+    let _mp = MemProtect::new(original_function, len, None)?;
 
     let nops = vec![0x90; len];
     write_aob(original_function, &nops)
@@ -94,13 +114,6 @@ pub unsafe fn hook_function(
     })?;
 
     FlushInstructionCache(ph, original_function as LPVOID, injection.len());
-
-    try_winapi!(VirtualProtect(
-        original_function as LPVOID,
-        len,
-        o_function_prot,
-        &mut ignored_prot
-    ));
 
     // Inject the jmp back if required
     if let Some(p) = new_function_end {
