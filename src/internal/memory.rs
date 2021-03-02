@@ -1,7 +1,8 @@
 use crate::error::{Error, ErrorType};
 use crate::try_winapi;
 use anyhow::{Context, Result};
-use std::ffi::CStr;
+use std::ffi::OsString;
+use std::os::windows::prelude::*;
 use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
@@ -291,16 +292,14 @@ where
 /// This function can fail on the
 /// GetModuleFileNameA, everything else is unsafe
 pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
-    let mut buf: Vec<i8> = Vec::with_capacity(255);
+    let mut buf: Vec<u16> = Vec::with_capacity(255);
 
-    try_winapi!(libloaderapi::GetModuleFileNameA(
+    try_winapi!(libloaderapi::GetModuleFileNameW(
         lib as _,
         buf.as_mut_ptr(),
         255
     ));
-    let name = CStr::from_ptr(buf.as_ptr());
-    let name = String::from(name.to_str()?);
-
+    let name = OsString::from_wide(&buf);
     let mut path: PathBuf = name.into();
     path.pop();
     Ok(path)
