@@ -71,13 +71,11 @@ macro_rules! scoped_no_mangle {
     }
 }
 
-/// Returns a tuple where the first value will contain the size of the pattern
-/// and the second value is a lambda that returns true if the pattern is
-/// matched otherwise will return false
+/// Returns a MemoryPattern struct
 #[macro_export]
 macro_rules! generate_aob_pattern {
     [$($val:tt),* ] => {
-        (
+        MemoryPattern::new(
             $crate::count_args!($(($val)),*),
         |slice: &[u8]| -> bool {
             match slice {

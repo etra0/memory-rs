@@ -29,20 +29,20 @@ fn test_write_aob() {
 
 #[test]
 fn test_generate_aob_pattern() {
-    let (size, func) = memory_rs::generate_aob_pattern![0xAA, _, 0xBB, _];
+    let mp = memory_rs::generate_aob_pattern![0xAA, _, 0xBB, _];
     let arr = [0xAA, 0xBB, 0xBB, 0xEE];
 
-    assert_eq!(size, 4);
-    assert!(func(&arr));
+    assert_eq!(mp.size, 4);
+    assert!(mp.scan(&arr));
 }
 
 #[test]
 fn test_scan_aob() {
     let p = &SEARCH_ARRAY as *const u8 as usize;
     let arr_len = SEARCH_ARRAY.len();
-    let (size, func) = memory_rs::generate_aob_pattern![0xFF, _, 0xC0];
+    let mp = memory_rs::generate_aob_pattern![0xFF, _, 0xC0];
 
-    let addr = scan_aob(p, arr_len, func, size).unwrap();
+    let addr = scan_aob(p, arr_len, mp).unwrap();
 
     assert_eq!(Some(p + 5), addr);
 }
@@ -52,10 +52,10 @@ fn test_scan_aob_all_matches() {
     let p: [u8; 10] =
         [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC];
     let arr_len = p.len();
-    let (size, func) = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
+    let mp = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
 
     let addr =
-        scan_aob_all_matches(p.as_ptr() as usize, arr_len, func, size).unwrap();
+        scan_aob_all_matches(p.as_ptr() as usize, arr_len, mp).unwrap();
 
     // Recreate the original array since the pattern repeats every 3 bytes.
     let mut v = vec![];
@@ -76,9 +76,9 @@ fn test_scan_aob_not_valid_memory() {
 
     let p = 0x12345678;
     let len = 0xFFFF;
-    let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+    let mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
 
-    let addr = scan_aob(p, len, func, size);
+    let addr = scan_aob(p, len, mp);
 
     if let Err(e) = addr {
         let e: error::Error = e.downcast().unwrap();
@@ -95,9 +95,9 @@ fn test_scan_aob_out_of_bounds() {
 
     let p = &SEARCH_ARRAY as *const u8 as usize;
     let len = 0xFFFFF;
-    let (size, func) = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+    let mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
 
-    let addr = scan_aob(p, len, func, size);
+    let addr = scan_aob(p, len, mp);
 
     if let Err(e) = addr {
         let e: error::Error = e.downcast().unwrap();
