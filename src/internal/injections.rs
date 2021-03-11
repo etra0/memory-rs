@@ -1,4 +1,4 @@
-use crate::internal::memory::{hook_function, scan_aob, write_aob};
+use crate::internal::memory::{hook_function, scan_aob, write_aob, MemoryPattern};
 use crate::internal::process_info::ProcessInfo;
 use anyhow::{Context, Result};
 
@@ -54,23 +54,19 @@ impl Detour {
 
     /// Creates a Detour from scan_aob. This function can fail
     /// in the case when the scan_aob can't find it's target.
-    pub fn new_from_aob<T>(
-        scan: (usize, T),
+    pub fn new_from_aob(
+        scan: MemoryPattern,
         process_inf: &ProcessInfo,
         new_function: usize,
         function_end: Option<&'static mut usize>,
         size_injection: usize,
         offset: Option<isize>,
     ) -> Result<Detour>
-    where
-        T: Fn(&[u8]) -> bool,
     {
-        let (size, func) = scan;
         let mut entry_point = scan_aob(
             process_inf.region.start_address,
             process_inf.region.size,
-            func,
-            size,
+            scan
         )?
         .context("Couldn't find aob")?;
 
@@ -152,7 +148,7 @@ impl Injection {
     /// Creates a new injection using the `generate_aob_pattern` macro.
     /// # Example
     /// ```
-    /// # use memory_rs::internal::injections::*;
+    /// # use memory_rs::internal::{injections::*, memory::MemoryPattern};
     /// # use memory_rs::internal::process_info::ProcessInfo;
     /// # use memory_rs::generate_aob_pattern;
     /// # #[allow(non_upper_case_globals)]
@@ -173,20 +169,16 @@ impl Injection {
     /// assert_eq!(&arr[1..4], &[0xAA, 0xFF, 0xBB]);
     ///
     /// ```
-    pub fn new_from_aob<T>(
+    pub fn new_from_aob(
         proc_inf: &ProcessInfo,
         f_new: Vec<u8>,
-        aob_tuple: (usize, T),
+        memory_pattern: MemoryPattern,
     ) -> Result<Injection>
-    where
-        T: Fn(&[u8]) -> bool,
     {
-        let (size, func) = aob_tuple;
         let entry_point = scan_aob(
             proc_inf.region.start_address,
             proc_inf.region.size,
-            func,
-            size,
+            memory_pattern
         )?
         .context("Couldn't find aob")?;
         Ok(Injection::new(entry_point, f_new))

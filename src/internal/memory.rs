@@ -14,33 +14,37 @@ use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 pub struct MemProtect {
     addr: usize,
     size: usize,
-    prot: u32
+    prot: u32,
 }
 
 /// Scoped VirtualProtect.
 /// # Safety
-/// The only unsafe bit is the VirtualProtect, which according to msdn 
+/// The only unsafe bit is the VirtualProtect, which according to msdn
 /// it shouldn't have undefined behavior, so we wrap that function with an
 /// `try_winapi!` macro.
 impl MemProtect {
     pub fn new(addr: usize, size: usize, prot: Option<u32>) -> Result<Self> {
         let new_prot = match prot {
             Some(p) => p,
-            None => PAGE_EXECUTE_READWRITE
+            None => PAGE_EXECUTE_READWRITE,
         };
 
         let mut old_prot = 0u32;
 
         unsafe {
-        try_winapi!(VirtualProtect(
-            addr as LPVOID,
-            size,
-            new_prot,
-            &mut old_prot
-        ));
-    }
+            try_winapi!(VirtualProtect(
+                addr as LPVOID,
+                size,
+                new_prot,
+                &mut old_prot
+            ));
+        }
 
-        Ok(Self { addr, size, prot: old_prot })
+        Ok(Self {
+            addr,
+            size,
+            prot: old_prot,
+        })
     }
 }
 
@@ -48,8 +52,24 @@ impl Drop for MemProtect {
     fn drop(&mut self) {
         let mut _prot = 0;
         unsafe {
-        VirtualProtect(self.addr as _, self.size, self.prot, &mut _prot);
+            VirtualProtect(self.addr as _, self.size, self.prot, &mut _prot);
         }
+    }
+}
+
+pub struct MemoryPattern {
+    pub size: usize,
+    pub pattern: fn(&[u8]) -> bool
+}
+
+impl MemoryPattern {
+    pub fn new(size: usize, pattern: fn(&[u8]) -> bool) -> Self
+    {
+        MemoryPattern { size, pattern }
+    }
+
+    pub fn scan(&self, val: &[u8]) -> bool {
+        (self.pattern)(val)
     }
 }
 
@@ -179,21 +199,18 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
 /// `pattern_function` receives a lambda with an `&[u8]` as argument and
 /// returns true or false if the pattern is matched. You can generate
 /// that function using `generate_aob_pattern!` macro.
-pub fn scan_aob<F>(
+pub fn scan_aob(
     start_address: usize,
     len: usize,
-    pattern_function: F,
-    pattern_size: usize,
+    memory_pattern: MemoryPattern,
 ) -> Result<Option<usize>>
-where
-    F: Fn(&[u8]) -> bool,
 {
     check_valid_region(start_address, len)?;
 
     let data =
         unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
 
-    let index = data.windows(pattern_size).position(pattern_function);
+    let index = data.windows(memory_pattern.size).position(memory_pattern.pattern);
 
     match index {
         Some(addr) => Ok(Some(start_address + addr)),
@@ -204,24 +221,21 @@ where
 /// Search for all matches over a pattern. This function will always
 /// return a [std::vec::Vec], if it doesn't find anything, it will return
 /// an empty vector.
-pub fn scan_aob_all_matches<F>(
+pub fn scan_aob_all_matches(
     start_address: usize,
     len: usize,
-    pattern_function: F,
-    pattern_size: usize,
+    memory_pattern: MemoryPattern
 ) -> Result<Vec<usize>>
-where
-    F: Fn(&[u8]) -> bool + Copy,
 {
     check_valid_region(start_address, len)?;
 
     let data =
         unsafe { std::slice::from_raw_parts(start_address as *mut u8, len) };
-    let mut iter = data.windows(pattern_size);
+    let mut iter = data.windows(memory_pattern.size);
     let mut matches: Vec<usize> = Vec::new();
 
     loop {
-        let val = iter.position(pattern_function);
+        let val = iter.position(memory_pattern.pattern);
         if val.is_none() {
             break;
         }
