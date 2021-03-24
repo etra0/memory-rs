@@ -1,6 +1,5 @@
 use std::ffi::CStr;
 use std::io::Error;
-use std::mem;
 use winapi::shared::basetsd::DWORD_PTR;
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::minwindef::{LPCVOID, LPVOID};
@@ -16,7 +15,7 @@ pub struct Process {
 }
 
 impl Process {
-    pub fn new(process_name: &str) -> Result<Process, Error> {
+    pub fn new(process_name: &str) -> Result<Process, Box<dyn std::error::Error>> {
         let process_id = get_process_id(process_name)?;
         let module_base_address = get_module_base(process_id, process_name)?;
 
@@ -29,7 +28,7 @@ impl Process {
         };
 
         if h_process.is_null() {
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error().into());
         }
 
         Ok(Process {
@@ -196,94 +195,116 @@ impl Process {
     }
 }
 
-pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
-    let mut process_id: DWORD = 0;
-    let h_snap = unsafe {
-        tlhelp32::CreateToolhelp32Snapshot(tlhelp32::TH32CS_SNAPPROCESS, 0)
-    };
+pub trait WindowsEntry {
+    fn set_size(&mut self);
+    fn iterable(&mut self, handle: HANDLE, first: &mut bool) -> Result<u32, Box<dyn std::error::Error>>;
+}
 
-    if h_snap == handleapi::INVALID_HANDLE_VALUE {
-        return Err(Error::last_os_error());
+pub struct ToolhelpSnapshot<T> {
+    snapshot: HANDLE,
+    entry: Box<T>,
+    first: bool
+}
+
+impl WindowsEntry for tlhelp32::PROCESSENTRY32 {
+    fn set_size(&mut self) {
+        self.dwSize = std::mem::size_of::<tlhelp32::PROCESSENTRY32>() as _;
     }
 
-    let mut process_entry = tlhelp32::PROCESSENTRY32 {
-        dwSize: mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32,
-        ..Default::default()
-    };
+    fn iterable(&mut self, handle: HANDLE, first: &mut bool) -> Result<u32, Box<dyn std::error::Error>> {
+        let val = if *first {
+            (*first) = false;
+            unsafe { tlhelp32::Process32First(handle, self as _) }
+        } else {
+            unsafe { tlhelp32::Process32Next(handle, self as _) }
+        };
+        if val != 0 {
+            Ok(val as _)
+        } else {
+            Err("No more inputs".into())
+        }
+    }
+}
 
-    unsafe {
-        if tlhelp32::Process32First(h_snap, &mut process_entry) == 1 {
-            process_id = loop {
-                let current_name =
-                    CStr::from_ptr(process_entry.szExeFile.as_ptr())
-                        .to_str()
-                        .expect("No string found");
+impl WindowsEntry for tlhelp32::MODULEENTRY32 {
+    fn set_size(&mut self) {
+        self.dwSize = std::mem::size_of::<tlhelp32::MODULEENTRY32>() as _;
+    }
 
-                if current_name == process_name {
-                    break process_entry.th32ProcessID;
-                }
+    fn iterable(&mut self, handle: HANDLE, first: &mut bool) -> Result<u32, Box<dyn std::error::Error>> {
+        let val = if *first {
+            (*first) = false;
+            unsafe { tlhelp32::Module32First(handle, self as _) }
+        } else {
+            unsafe { tlhelp32::Module32Next(handle, self as _) }
+        };
+        if val != 0 {
+            Ok(val as _)
+        } else {
+            Err("No more inputs".into())
+        }
+    }
+}
 
-                if tlhelp32::Process32Next(h_snap, &mut process_entry) == 0 {
-                    break 0;
-                }
-            }
+impl<T: Default + WindowsEntry> ToolhelpSnapshot<T> {
+    pub fn new(flags: u32, process_id: u32) -> Result<Self, Box<dyn std::error::Error>> {
+        let snapshot = unsafe { tlhelp32::CreateToolhelp32Snapshot(flags, process_id) };
+
+        if snapshot == handleapi::INVALID_HANDLE_VALUE {
+            return Err(Error::last_os_error().into());
         }
 
-        handleapi::CloseHandle(h_snap);
+        let mut entry = T::default();
+        entry.set_size();
+        let entry = entry.into();
+        Ok(Self { snapshot, entry, first: true })
     }
+}
 
-    if process_id == 0 {
-        return Err(Error::last_os_error());
+impl<T> Drop for ToolhelpSnapshot<T> {
+    fn drop(&mut self) {
+        unsafe { handleapi::CloseHandle(self.snapshot) };
     }
+}
 
-    Ok(process_id)
+impl<T: Clone + WindowsEntry> Iterator for ToolhelpSnapshot<T> {
+    type Item = Box<T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = WindowsEntry::iterable(self.entry.as_mut(), self.snapshot, &mut self.first).unwrap();
+        if res == 0 {
+            return None;
+        }
+        let pe = self.entry.clone();
+        Some(pe)
+    }
+}
+
+pub fn get_process_id(process_name: &str) -> Result<DWORD, Box<dyn std::error::Error>> {
+    let toolhelp = ToolhelpSnapshot::new(tlhelp32::TH32CS_SNAPPROCESS, 0)?;
+
+    toolhelp.into_iter().find_map(|x: Box<tlhelp32::PROCESSENTRY32>| {
+        let current_name = unsafe { CStr::from_ptr(x.szExeFile.as_ptr()).to_str().expect("No string found") };
+        if current_name == process_name {
+            return Some(x.th32ProcessID as DWORD)
+        }
+        return None
+    }).ok_or("Couldn't find the process".into())
 }
 
 pub fn get_module_base(
     process_id: DWORD,
     module_name: &str,
-) -> Result<DWORD_PTR, Error> {
-    let mut module_base_address: DWORD_PTR = 0x0;
-    let h_snap = unsafe {
-        tlhelp32::CreateToolhelp32Snapshot(
-            tlhelp32::TH32CS_SNAPMODULE | tlhelp32::TH32CS_SNAPMODULE32,
-            process_id,
-        )
-    };
+) -> Result<DWORD_PTR, Box<dyn std::error::Error>> {
+    let toolhelp = ToolhelpSnapshot::new(
+        tlhelp32::TH32CS_SNAPMODULE | tlhelp32::TH32CS_SNAPMODULE32,
+        process_id as _
+    )?;
 
-    if h_snap == handleapi::INVALID_HANDLE_VALUE {
-        return Err(Error::last_os_error());
-    }
-
-    let mut module_entry = tlhelp32::MODULEENTRY32 {
-        dwSize: mem::size_of::<tlhelp32::MODULEENTRY32>() as u32,
-        ..Default::default()
-    };
-
-    unsafe {
-        if tlhelp32::Module32First(h_snap, &mut module_entry) != 0 {
-            module_base_address = loop {
-                let current_name =
-                    CStr::from_ptr(module_entry.szModule.as_ptr())
-                        .to_str()
-                        .expect("No string found");
-
-                if current_name == module_name {
-                    break module_entry.modBaseAddr as DWORD_PTR;
-                }
-
-                if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
-                    break 0;
-                }
-            }
+    toolhelp.into_iter().find_map(|x: Box<tlhelp32::MODULEENTRY32>| {
+        let current_name = unsafe { CStr::from_ptr(x.szModule.as_ptr()).to_str().expect("No string found") };
+        if current_name == module_name {
+            return Some(x.modBaseAddr as DWORD_PTR)
         }
-
-        handleapi::CloseHandle(h_snap);
-    }
-
-    if module_base_address == 0 {
-        return Err(Error::last_os_error());
-    }
-
-    Ok(module_base_address)
+        return None
+    }).ok_or("Couldn't find the module".into())
 }

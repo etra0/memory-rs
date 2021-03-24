@@ -60,6 +60,8 @@ macro_rules! try_winapi {
             )
             .into());
         }
+
+        res
     }};
 }
 
