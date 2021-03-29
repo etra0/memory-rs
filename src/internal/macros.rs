@@ -75,7 +75,7 @@ macro_rules! scoped_no_mangle {
 #[macro_export]
 macro_rules! generate_aob_pattern {
     [$($val:tt),* ] => {
-        MemoryPattern::new(
+        $crate::internal::memory::MemoryPattern::new(
             $crate::count_args!($(($val)),*),
         |slice: &[u8]| -> bool {
             match slice {
