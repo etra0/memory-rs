@@ -206,10 +206,3 @@ fn test_hashmap() {
     assert_eq!(&arr[..2], &[0xAA, 0xFA]);
 }
 
-// macro_rules! doctest {
-//     ($x:expr) => {
-//         #[doc = $x]
-//         extern {}
-//     }
-// }
-// doctest!(include_str!("../README.md"));

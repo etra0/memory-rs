@@ -12,3 +12,11 @@ pub mod error;
 
 #[cfg(target_os = "windows")]
 pub mod external;
+
+macro_rules! doctest {
+    ($x:expr) => {
+        #[doc = $x]
+        extern {}
+    }
+}
+doctest!(include_str!("../README.md"));
