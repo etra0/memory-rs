@@ -1,6 +1,7 @@
 #![allow(non_upper_case_globals)]
 use memory_rs::internal::injections::*;
 use memory_rs::internal::memory::*;
+use memory_rs::internal::memory_region::*;
 
 static TO_BE_WRITTEN: [u8; 8] =
     [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
@@ -67,6 +68,29 @@ fn test_scan_aob_all_matches() {
     assert_eq!(
         &[0xAA, 0xBB, 0xCC, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC],
         &v[..]
+    );
+}
+
+#[test]
+fn test_scan_aob_all_matches_aligned() {
+    let p: [u8; 12] =
+        [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xFF, 0xCC, 0x00, 0xAA, 0xEE, 0xCC, 0x00];
+    let arr_len = p.len();
+    let mp = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
+    let region = MemoryRegion::new(&p as *const u8 as _, arr_len, true).unwrap();
+
+    let addr =
+        region.scan_aob_all_matches_aligned(mp.pattern, mp.size, None).unwrap();
+
+    let ptr = &p as *const u8 as usize;
+    let results = [
+        ptr,
+        ptr + 4,
+        ptr + 8
+    ];
+
+    assert_eq!(
+        &addr, &results
     );
 }
 

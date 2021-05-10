@@ -87,6 +87,42 @@ impl MemoryRegion {
         Ok(matches)
     }
 
+    /// Scan all aob matches aligned at `align`. If None is provided, it will align to 4 by default
+    pub fn scan_aob_all_matches_aligned<F>(
+        &self,
+        pattern_function: F,
+        pattern_size: usize,
+        align: Option<usize>
+    ) -> Result<Vec<usize>>
+    where
+        F: Fn(&[u8]) -> bool + Copy,
+    {
+        self.check_valid_region()?;
+        let data = unsafe {
+            std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
+        };
+        let align = align.unwrap_or(4);
+        let padding = (align - (pattern_size % align)) % align;
+        let chunk_size = pattern_size + padding;
+        let mut iter = data.chunks_exact(chunk_size);
+        let mut matches = Vec::new();
+
+        loop {
+            let val = iter.position(|x| pattern_function(&x[..pattern_size]));
+            if val.is_none() {
+                break;
+            }
+
+            let val = val.unwrap();
+            match matches.last() {
+                Some(&last_val) => matches.push((val + 0x1)*chunk_size + last_val),
+                None => matches.push(self.start_address + val),
+            };
+        }
+
+        Ok(matches)
+    }
+
     pub fn scan_aligned_value<T>(&self, value: T) -> Result<Vec<usize>>
     where
         T: Copy + PartialEq,
