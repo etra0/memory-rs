@@ -78,14 +78,7 @@ macro_rules! generate_aob_pattern {
         $crate::internal::memory::MemoryPattern::new(
             $crate::count_args!($(($val)),*),
         |slice: &[u8]| -> bool {
-            match slice {
-                [$($val),*] => {
-                    return true;
-                },
-                _ => {
-                    return false;
-                }
-            };
+            matches!(slice, [$($val),*])
         }
         )
     }
