@@ -1,5 +1,6 @@
-use crate::internal::memory::{hook_function, scan_aob, write_aob, MemoryPattern};
+use crate::internal::memory::{hook_function, write_aob, MemoryPattern};
 use crate::internal::process_info::ProcessInfo;
+use crate::internal::memory_region::*;
 use anyhow::{Context, Result};
 
 /// Trait specifically designed to extend the Vec<T> struct in order
@@ -56,19 +57,16 @@ impl Detour {
     /// in the case when the scan_aob can't find it's target.
     pub fn new_from_aob(
         scan: MemoryPattern,
-        process_inf: &ProcessInfo,
+        region: &MemoryRegion,
         new_function: usize,
         function_end: Option<&'static mut usize>,
         size_injection: usize,
         offset: Option<isize>,
     ) -> Result<Detour>
     {
-        let mut entry_point = scan_aob(
-            process_inf.region.start_address,
-            process_inf.region.size,
-            scan
-        )?
-        .context("Couldn't find aob")?;
+        let mut entry_point = region
+            .scan_aob(&scan)?
+            .context("Couldn't find aob")?;
 
         if let Some(v) = offset {
             entry_point = ((entry_point as isize) + v) as usize;
@@ -156,7 +154,7 @@ impl Injection {
     /// # // avoid removal of arr at compilation
     /// # println!("{:x?}", arr);
     /// # let proc_inf = ProcessInfo::new(None).unwrap();
-    /// let mut injection = Injection::new_from_aob(&proc_inf, vec![0x90; 3],
+    /// let mut injection = Injection::new_from_aob(&proc_inf.region, vec![0x90; 3],
     ///     generate_aob_pattern![0xAA, _, 0xBB, 0xFF]).unwrap();
     /// // With this we nop the bytes (i.e. we write 0x90) where
     /// // generate_aob_pattern has a match.
@@ -170,16 +168,12 @@ impl Injection {
     ///
     /// ```
     pub fn new_from_aob(
-        proc_inf: &ProcessInfo,
+        region: &MemoryRegion,
         f_new: Vec<u8>,
         memory_pattern: MemoryPattern,
     ) -> Result<Injection>
     {
-        let entry_point = scan_aob(
-            proc_inf.region.start_address,
-            proc_inf.region.size,
-            memory_pattern
-        )?
+        let entry_point = region.scan_aob(&memory_pattern)?
         .context("Couldn't find aob")?;
         Ok(Injection::new(entry_point, f_new))
     }

@@ -35,20 +35,17 @@ impl MemoryRegion {
         Ok(())
     }
 
-    pub fn scan_aob<F>(
+    pub fn scan_aob(
         &self,
-        pattern_function: F,
-        pattern_size: usize,
+        pat: &memory::MemoryPattern,
     ) -> Result<Option<usize>>
-    where
-        F: Fn(&[u8]) -> bool,
     {
         self.check_valid_region()?;
 
         let data = unsafe {
             std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
         };
-        let index = data.windows(pattern_size).position(pattern_function);
+        let index = data.windows(pat.size).position(pat.pattern);
 
         match index {
             Some(addr) => Ok(Some(self.start_address + addr)),
@@ -56,23 +53,20 @@ impl MemoryRegion {
         }
     }
 
-    pub fn scan_aob_all_matches<F>(
+    pub fn scan_aob_all_matches(
         &self,
-        pattern_function: F,
-        pattern_size: usize,
+        pat: &memory::MemoryPattern,
     ) -> Result<Vec<usize>>
-    where
-        F: Fn(&[u8]) -> bool + Copy,
     {
         self.check_valid_region()?;
         let data = unsafe {
             std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
         };
-        let mut iter = data.windows(pattern_size);
+        let mut iter = data.windows(pat.size);
         let mut matches = Vec::new();
 
         loop {
-            let val = iter.position(pattern_function);
+            let val = iter.position(pat.pattern);
             if val.is_none() {
                 break;
             }
@@ -88,27 +82,24 @@ impl MemoryRegion {
     }
 
     /// Scan all aob matches aligned at `align`. If None is provided, it will align to 4 by default
-    pub fn scan_aob_all_matches_aligned<F>(
+    pub fn scan_aob_all_matches_aligned(
         &self,
-        pattern_function: F,
-        pattern_size: usize,
+        pat: &memory::MemoryPattern,
         align: Option<usize>
     ) -> Result<Vec<usize>>
-    where
-        F: Fn(&[u8]) -> bool + Copy,
     {
         self.check_valid_region()?;
         let data = unsafe {
             std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
         };
         let align = align.unwrap_or(4);
-        let padding = (align - (pattern_size % align)) % align;
-        let chunk_size = pattern_size + padding;
+        let padding = (align - (pat.size % align)) % align;
+        let chunk_size = pat.size + padding;
         let mut iter = data.chunks_exact(chunk_size);
         let mut matches = Vec::new();
 
         loop {
-            let val = iter.position(|x| pattern_function(&x[..pattern_size]));
+            let val = iter.position(|x| pat.scan(&x[..pat.size]));
             if val.is_none() {
                 break;
             }

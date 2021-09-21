@@ -12,7 +12,6 @@ to use it.
 
 ```rust
 use memory_rs::generate_aob_pattern;
-use memory_rs::internal::memory::scan_aob;
 use memory_rs::internal::process_info::ProcessInfo;
 use memory_rs::internal::injections::*;
 
@@ -49,7 +48,7 @@ fn patch() -> Result<(), Box<dyn std::error::Error>> {
             0x85, 0xE4
         ];
         let region = &proc_inf.region;
-        scan_aob(region.start_address, region.size, memory_pattern)?
+        region.scan_aob(&memory_pattern)?
             .ok_or("Couldn't find enable_hots_addr")? - 0xA
     };
 
@@ -69,7 +68,7 @@ fn patch() -> Result<(), Box<dyn std::error::Error>> {
             0x0F, 0x86, _, _, 0xAA, 0xBB
         ];
         let region = &proc_inf.region;
-        scan_aob(region.start_address, region.size, memory_pattern)?
+        region.scan_aob(&memory_pattern)?
             .ok_or("Couldn't find black_bars_addr")?
     };
 

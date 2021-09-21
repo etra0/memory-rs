@@ -42,8 +42,9 @@ fn test_scan_aob() {
     let p = &SEARCH_ARRAY as *const u8 as usize;
     let arr_len = SEARCH_ARRAY.len();
     let mp = memory_rs::generate_aob_pattern![0xFF, _, 0xC0];
+    let reg = MemoryRegion::new(p, arr_len, true).unwrap();
 
-    let addr = scan_aob(p, arr_len, mp).unwrap();
+    let addr = reg.scan_aob(&mp).unwrap();
 
     assert_eq!(Some(p + 5), addr);
 }
@@ -54,9 +55,10 @@ fn test_scan_aob_all_matches() {
         [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xFF, 0xCC, 0xAA, 0xEE, 0xCC];
     let arr_len = p.len();
     let mp = memory_rs::generate_aob_pattern![0xAA, _, 0xCC];
+    let reg = MemoryRegion::new(p.as_ptr() as usize, arr_len, true).unwrap();
 
     let addr =
-        scan_aob_all_matches(p.as_ptr() as usize, arr_len, mp).unwrap();
+        reg.scan_aob_all_matches(&mp).unwrap();
 
     // Recreate the original array since the pattern repeats every 3 bytes.
     let mut v = vec![];
@@ -80,7 +82,7 @@ fn test_scan_aob_all_matches_aligned() {
     let region = MemoryRegion::new(&p as *const u8 as _, arr_len, true).unwrap();
 
     let addr =
-        region.scan_aob_all_matches_aligned(mp.pattern, mp.size, None).unwrap();
+        region.scan_aob_all_matches_aligned(&mp, None).unwrap();
 
     let ptr = &p as *const u8 as usize;
     let results = [
@@ -101,10 +103,9 @@ fn test_scan_aob_not_valid_memory() {
     let p = 0x12345678;
     let len = 0xFFFF;
     let mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+    let reg = MemoryRegion::new(p, len, false);
 
-    let addr = scan_aob(p, len, mp);
-
-    if let Err(e) = addr {
+    if let Err(e) = reg {
         let e: error::Error = e.downcast().unwrap();
         assert_eq!(e.kind(), error::ErrorType::Internal);
         assert_eq!(e.msg(), "The region to scan is invalid".to_string());
@@ -120,10 +121,10 @@ fn test_scan_aob_out_of_bounds() {
     let p = &SEARCH_ARRAY as *const u8 as usize;
     let len = 0xFFFFF;
     let mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+    let reg = MemoryRegion::new(p, len, false);
 
-    let addr = scan_aob(p, len, mp);
 
-    if let Err(e) = addr {
+    if let Err(e) = reg {
         let e: error::Error = e.downcast().unwrap();
         assert_eq!(e.kind(), error::ErrorType::Internal);
         assert_eq!(e.msg(), "The region to scan is invalid".to_string());
@@ -187,10 +188,9 @@ fn test_drop_injection() {
 #[test]
 fn test_scan_aligned_value() {
     let vals: [u32; 4] = [0xC0FFEE, 0x1337, 0xB00BA, 0xC0FFEE];
+    let reg = MemoryRegion::new(vals.as_ptr() as *const u32 as usize, 16, true).unwrap();
 
-    let result = scan_aligned_value(
-        vals.as_ptr() as *const u32 as usize,
-        16,
+    let result = reg.scan_aligned_value(
         0xC0FFEE_u32,
     )
     .unwrap();
