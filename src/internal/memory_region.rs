@@ -22,7 +22,7 @@ impl MemoryRegion {
         };
 
         // Do at least one check if the memory is safe
-        memory_region.check_valid_region()?;
+        memory::check_valid_region(start_address, size)?;
 
         Ok(memory_region)
     }
