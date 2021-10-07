@@ -19,7 +19,7 @@ pub struct ProcessInfo {
 impl ProcessInfo {
     /// Create the ProcessInfo. This function can fail in case where
     /// the `GetModuleInformation` fails.
-    pub fn new(name: Option<&'static str>) -> Result<ProcessInfo> {
+    pub fn new(name: Option<&str>) -> Result<ProcessInfo> {
         let module = match name {
             Some(n) => {
                 let name_ = CString::new(n)?;
