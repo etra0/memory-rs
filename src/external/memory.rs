@@ -105,8 +105,7 @@ pub fn hook_function(
     let relative_aob: [u8; 4] =
         unsafe { transmute::<DWORD, [u8; 4]>(relative_address.to_le()) };
 
-    let mut instructions: Vec<u8> = Vec::new();
-    instructions.push(0xE8);
+    let mut instructions: Vec<u8> = vec![0xE8];
     instructions.extend_from_slice(&relative_aob[..]);
 
     let written = write_aob(h_process, to_hook, &instructions);

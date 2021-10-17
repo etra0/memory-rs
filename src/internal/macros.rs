@@ -63,6 +63,41 @@ macro_rules! try_winapi {
     }};
 }
 
+/// Wrap a function to a lambda which returns a Result<_, Error>
+/// depending of the condition.
+/// You should use it like
+/// wrap_winapi!(MyFunction(), MyCondition) where
+/// MyCondition **must** start with an x and the comparison.
+/// For example
+/// ```
+/// # use memory_rs::wrap_winapi;
+/// // This should fail since we are saying that
+/// // when the return value equals to 0 it's an error.
+/// assert!(wrap_winapi!((|| 0)(), x == 0).is_err());
+/// ```
+#[macro_export]
+macro_rules! wrap_winapi {
+    ($call:expr, x $($tt:tt)*) => {
+        (|| -> Result<_, $crate::error::Error> {
+            let res = $call;
+            let x = res as usize;
+            if x $($tt)* {
+                let msg = format!(
+                    "{} failed with error `{}`",
+                    std::stringify!($call),
+                    std::io::Error::last_os_error()
+                );
+                return Err($crate::error::Error::new(
+                    $crate::error::ErrorType::WinAPI,
+                    msg,
+                )
+                .into());
+            }
+            Ok(res)
+        })()
+    };
+}
+
 /// Scoped no mangle to avoid repetition
 #[macro_export]
 macro_rules! scoped_no_mangle {

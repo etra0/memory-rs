@@ -102,7 +102,7 @@ fn test_scan_aob_not_valid_memory() {
 
     let p = 0x12345678;
     let len = 0xFFFF;
-    let mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+    let _mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
     let reg = MemoryRegion::new(p, len, false);
 
     if let Err(e) = reg {
@@ -120,7 +120,7 @@ fn test_scan_aob_out_of_bounds() {
 
     let p = &SEARCH_ARRAY as *const u8 as usize;
     let len = 0xFFFFF;
-    let mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
+    let _mp = memory_rs::generate_aob_pattern![0xAA, 0xBB, 0xCC, 0xDD];
     let reg = MemoryRegion::new(p, len, false);
 
 

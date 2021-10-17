@@ -1,6 +1,6 @@
 use crate::error::{Error, ErrorType};
 use crate::internal::memory_region::*;
-use crate::try_winapi;
+use crate::wrap_winapi;
 use anyhow::Result;
 use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
@@ -23,9 +23,9 @@ impl ProcessInfo {
         let module = match name {
             Some(n) => {
                 let name_ = CString::new(n)?;
-                unsafe { GetModuleHandleA(name_.as_ptr()) }
+                unsafe { wrap_winapi!(GetModuleHandleA(name_.as_ptr()), x == 0)? }
             }
-            None => unsafe { GetModuleHandleA(std::ptr::null()) },
+            None => unsafe { wrap_winapi!(GetModuleHandleA(std::ptr::null()), x == 0)? },
         };
 
         let module_addr = module as usize;
@@ -34,12 +34,12 @@ impl ProcessInfo {
         unsafe {
             let process = GetCurrentProcess();
             let mut module_info = winapi::um::psapi::MODULEINFO::default();
-            try_winapi!(GetModuleInformation(
+            wrap_winapi!(GetModuleInformation(
                 process,
                 module,
                 &mut module_info,
                 std::mem::size_of::<winapi::um::psapi::MODULEINFO>() as u32,
-            ));
+            ), x == 0)?;
 
             module_size = module_info.SizeOfImage as usize;
         }
