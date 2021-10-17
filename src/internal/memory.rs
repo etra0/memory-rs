@@ -1,5 +1,5 @@
 use crate::error::{Error, ErrorType};
-use crate::try_winapi;
+use crate::wrap_winapi;
 use anyhow::{Context, Result};
 use std::ffi::OsString;
 use std::os::windows::prelude::*;
@@ -24,20 +24,17 @@ pub struct MemProtect {
 /// `try_winapi!` macro.
 impl MemProtect {
     pub fn new(addr: usize, size: usize, prot: Option<u32>) -> Result<Self> {
-        let new_prot = match prot {
-            Some(p) => p,
-            None => PAGE_EXECUTE_READWRITE,
-        };
+        let new_prot = prot.unwrap_or(PAGE_EXECUTE_READWRITE);
 
         let mut old_prot = 0u32;
 
         unsafe {
-            try_winapi!(VirtualProtect(
+            wrap_winapi!(VirtualProtect(
                 addr as LPVOID,
                 size,
                 new_prot,
                 &mut old_prot
-            ));
+            ), x == 0)?;
         }
 
         Ok(Self {
@@ -174,11 +171,11 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     while region_size < len {
         let mut information = MEMORY_BASIC_INFORMATION::default();
         unsafe {
-            try_winapi!(VirtualQuery(
+            wrap_winapi!(VirtualQuery(
                 (start_address + region_size) as LPVOID,
                 &mut information,
                 size_mem_inf
-            ));
+            ), x == 0)?;
         }
 
         if information.State == MEM_FREE {
@@ -202,11 +199,11 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
 pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
     let mut buf: Vec<u16> = vec![0x0; 255];
 
-    try_winapi!(libloaderapi::GetModuleFileNameW(
+    wrap_winapi!(libloaderapi::GetModuleFileNameW(
         lib as _,
         buf.as_mut_ptr(),
         255
-    ));
+    ), x == 0)?;
     let name = OsString::from_wide(&buf);
     let mut path: PathBuf = name.into();
     path.pop();
