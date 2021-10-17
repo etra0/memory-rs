@@ -221,7 +221,7 @@ fn test_hashmap() {
             Injection::new(arr.as_ptr().offset(1) as usize, vec![0xFA]),
         );
     }
-    hash.inject();
+    hash.values_mut().for_each(|x| x.inject());
 
     assert_eq!(&arr[..2], &[0xFF, 0xFA]);
 
@@ -230,3 +230,30 @@ fn test_hashmap() {
     assert_eq!(&arr[..2], &[0xAA, 0xFA]);
 }
 
+#[test]
+fn test_slice() {
+    static arr: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
+
+    let mut injections = [
+        Injection::new(arr.as_ptr() as _, vec![32]),
+        Injection::new(unsafe { arr.as_ptr().offset(1) as _ }, vec![42]),
+    ];
+
+    injections.iter_mut().inject();
+
+    assert_eq!(arr, [32_u8, 42, 0xCC, 0xDD]);
+}
+
+#[test]
+fn test_vector() {
+    static arr: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
+
+    let mut injections = vec![
+        Injection::new(arr.as_ptr() as _, vec![32]),
+        Injection::new(unsafe { arr.as_ptr().offset(1) as _ }, vec![42]),
+    ];
+
+    injections.iter_mut().inject();
+
+    assert_eq!(arr, [32_u8, 42, 0xCC, 0xDD]);
+}

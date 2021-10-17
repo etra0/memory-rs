@@ -1,3 +1,5 @@
+use std::slice::IterMut;
+
 use crate::internal::memory::{hook_function, write_aob, MemoryPattern};
 use crate::internal::memory_region::*;
 use anyhow::{Context, Result};
@@ -243,21 +245,12 @@ impl Drop for StaticElement {
     }
 }
 
-impl<I: Inject> Inject for std::vec::Vec<I> {
+impl<T: Inject> Inject for IterMut<'_, T> {
     fn inject(&mut self) {
-        self.iter_mut().for_each(|x| (*x).inject());
-    }
-    fn remove_injection(&mut self) {
-        self.iter_mut().for_each(|x| (*x).remove_injection());
-    }
-}
-
-impl<I: Inject, H> Inject for std::collections::HashMap<H, I> {
-    fn inject(&mut self) {
-        self.values_mut().for_each(|x| (*x).inject());
+        self.for_each(|x| (*x).inject());
     }
 
     fn remove_injection(&mut self) {
-        self.values_mut().for_each(|x| (*x).remove_injection());
+        self.for_each(|x| (*x).remove_injection());
     }
 }
