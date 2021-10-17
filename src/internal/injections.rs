@@ -1,5 +1,4 @@
 use crate::internal::memory::{hook_function, write_aob, MemoryPattern};
-use crate::internal::process_info::ProcessInfo;
 use crate::internal::memory_region::*;
 use anyhow::{Context, Result};
 
@@ -83,16 +82,11 @@ impl Detour {
 
 impl Inject for Detour {
     fn inject(&mut self) {
-        let function_end = match self.function_end {
-            Some(ref mut x) => Some(&mut **x),
-            None => None,
-        };
-
         unsafe {
             hook_function(
                 self.entry_point,
                 self.new_function,
-                function_end,
+                self.function_end.as_deref_mut(),
                 self.f_orig.len(),
             )
             .unwrap();
