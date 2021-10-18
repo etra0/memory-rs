@@ -42,7 +42,7 @@ impl Detour {
 
         unsafe {
             let slice_ =
-                std::slice::from_raw_parts(entry_point as *mut u8, size);
+                std::slice::from_raw_parts(entry_point as *const u8, size);
             f_orig.extend_from_slice(slice_);
         }
 
