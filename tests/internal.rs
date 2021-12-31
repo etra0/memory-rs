@@ -257,3 +257,35 @@ fn test_vector() {
 
     assert_eq!(arr, [32_u8, 42, 0xCC, 0xDD]);
 }
+
+fn test_dyn_vec_original() -> &'static str {
+    println!("I'm original function");
+    "original"
+}
+
+fn test_dyn_vec_injected() -> &'static str {
+    println!("I'm injected function");
+    "injected"
+}
+
+#[test]
+fn test_dyn_vec() {
+
+    let original_function = test_dyn_vec_original as *mut u8 as usize;
+    let new_function = test_dyn_vec_injected as *mut u8 as usize;
+
+    static arr: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
+
+    let mut v: Vec<Box<dyn Inject>> = vec![
+        Box::new(Injection::new(arr.as_ptr() as _, vec![32])),
+        Box::new(Detour::new(original_function, 14, new_function, None)),
+    ];
+
+    assert_eq!(test_dyn_vec_original(), "original");
+
+    v.iter_mut().inject();
+
+    assert_eq!(test_dyn_vec_original(), "injected");
+
+    v.iter_mut().remove_injection();
+}

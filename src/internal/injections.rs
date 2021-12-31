@@ -1,4 +1,5 @@
 use std::slice::IterMut;
+use std::ops::DerefMut;
 
 use crate::internal::memory::{hook_function, write_aob, MemoryPattern};
 use crate::internal::memory_region::*;
@@ -245,12 +246,22 @@ impl Drop for StaticElement {
     }
 }
 
-impl<T: Inject> Inject for IterMut<'_, T> {
+impl Inject for Box<dyn Inject> {
     fn inject(&mut self) {
-        self.for_each(|x| (*x).inject());
+        self.deref_mut().inject();
     }
 
     fn remove_injection(&mut self) {
-        self.for_each(|x| (*x).remove_injection());
+        self.deref_mut().remove_injection();
+    }
+}
+
+impl<T: Inject> Inject for IterMut<'_, T> {
+    fn inject(&mut self) {
+        self.for_each(|x| x.inject());
+    }
+
+    fn remove_injection(&mut self) {
+        self.for_each(|x| x.remove_injection());
     }
 }

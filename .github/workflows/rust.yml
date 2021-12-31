@@ -26,4 +26,4 @@ jobs:
     - name: Build
       run: cargo build --target=${{ matrix.architecture }} --verbose
     - name: Run tests
-      run: cargo test --target=${{ matrix.architecture }} --verbose
+      run: cargo test --target=${{ matrix.architecture }} --verbose -- --test-threads=1
