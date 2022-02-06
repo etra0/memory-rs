@@ -1,5 +1,4 @@
 use std::slice::IterMut;
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::DerefMut;
 
@@ -273,22 +272,48 @@ impl Trampoline {
             injection_size,
             original_bytes: [0_u8; 64],
             shellcode_space,
-            detour: MaybeUninit::uninit()
+            detour: MaybeUninit::uninit(),
         };
 
-        unsafe { std::ptr::copy_nonoverlapping(original_function as *const u8,
-            result.original_bytes.as_mut_ptr(), injection_size) };
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                original_function as *const u8,
+                result.original_bytes.as_mut_ptr(),
+                injection_size,
+            )
+        };
 
         // Make sure we make the allocated space executable for the lulz.
         let mut old_prot = 0;
-        unsafe { VirtualProtect(result.shellcode_space.as_mut_ptr() as _, 1024, PAGE_EXECUTE_READWRITE, &mut old_prot) };
+        unsafe {
+            VirtualProtect(
+                result.shellcode_space.as_mut_ptr() as _,
+                1024,
+                PAGE_EXECUTE_READWRITE,
+                &mut old_prot,
+            )
+        };
+
+        // The ugliest pseudo JIT in the history of computers.
+        // This basically creates a Vec with something like 
+        // ```asm
+        // jmp [rip + 0x0]
+        // <new_function_addr>
+        // <original_instructions_of_original_function>
+        // (...)
+        // </original_instructions_of_original_function>
+        // jmp [rip + 0x0]
+        // <original_function_addr + injection_size>
+        // ```
+        //
+        // which at minimum requires 28 bytes without considering the original instructions.
+        // It's ugly, but functional.
 
         // extended jump is jmp [rip +0x0], which effectively jumps to the address next to the
         // instruction. This is useful for 8 bytes jump, this is not optimal but it's functional
         // because we can spare some bytes.
         let extended_jump = [0xff_u8, 0x25, 0x00, 0x00, 0x00, 0x00];
 
-        // First we write the jump into our function, which effectively requires 14 bytes.
         let mut injection: Vec<u8> = Vec::with_capacity(1024);
         injection.extend_from_slice(&extended_jump);
         injection.extend_from_slice(&result.new_function.to_le_bytes());
@@ -300,7 +325,12 @@ impl Trampoline {
 
         result.shellcode_space[..injection.len()].copy_from_slice(&injection);
         // Initialize internal detour
-        let detour: MaybeUninit<Detour> = MaybeUninit::new(Detour::new(result.original_function, result.injection_size, result.shellcode_space.as_ptr() as _, None));
+        let detour: MaybeUninit<Detour> = MaybeUninit::new(Detour::new(
+            result.original_function,
+            result.injection_size,
+            result.shellcode_space.as_ptr() as _,
+            None,
+        ));
         result.detour = detour;
 
         result
@@ -321,6 +351,16 @@ impl Inject for Trampoline {
     fn remove_injection(&mut self) {
         let detour = unsafe { self.detour.assume_init_mut() };
         detour.remove_injection();
+    }
+}
+
+impl Drop for Trampoline {
+    fn drop(&mut self) {
+        // Ugh, we need to allocate unnecesarily.
+        let mut b = Box::new([0_u8; 1024]);
+        std::mem::swap(&mut self.shellcode_space, &mut b);
+        Box::leak(b);
+
     }
 }
 
