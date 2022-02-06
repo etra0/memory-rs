@@ -1,9 +1,13 @@
-use std::ops::DerefMut;
 use std::slice::IterMut;
+use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+use std::ops::DerefMut;
 
 use crate::internal::memory::{hook_function, write_aob, MemoryPattern};
 use crate::internal::memory_region::*;
 use anyhow::{Context, Result};
+use winapi::um::memoryapi::VirtualProtect;
+use winapi::um::winnt::PAGE_EXECUTE_READWRITE;
 
 /// Trait specifically designed to extend the Vec<T> struct in order
 /// to easily write something like `vec.inject()` when you have a vector
@@ -237,6 +241,86 @@ impl Inject for StaticElement {
 impl Drop for StaticElement {
     fn drop(&mut self) {
         self.remove_injection();
+    }
+}
+
+#[derive(Debug)]
+pub struct Trampoline {
+    // Address of the new function
+    new_function: usize,
+    // Address of the original function
+    original_function: usize,
+
+    // Injection size, to know how many bytes to copy.
+    injection_size: usize,
+    original_bytes: [u8; 64],
+    shellcode_space: Box<[u8; 1024]>,
+    detour: MaybeUninit<Detour>
+}
+
+impl Trampoline {
+    pub fn new(new_function: usize, original_function: usize, injection_size: usize) -> Self {
+        // First we backup the starting bytes of the original function. Usually, the injection size
+        // is not that big so we can use a large-enough buffer.
+        // We need to make sure we manually checked how many bytes we need in order to not break
+        // any assembly instruction, so the injection size has to be carefully checked.
+        // TODO: Check this is the correct way.
+        let shellcode_space = Box::new([0_u8; 1024]);
+
+        let mut result = Self {
+            new_function,
+            original_function,
+            injection_size,
+            original_bytes: [0_u8; 64],
+            shellcode_space,
+            detour: MaybeUninit::uninit()
+        };
+
+        unsafe { std::ptr::copy_nonoverlapping(original_function as *const u8,
+            result.original_bytes.as_mut_ptr(), injection_size) };
+
+        // Make sure we make the allocated space executable for the lulz.
+        let mut old_prot = 0;
+        unsafe { VirtualProtect(result.shellcode_space.as_mut_ptr() as _, 1024, PAGE_EXECUTE_READWRITE, &mut old_prot) };
+
+        // extended jump is jmp [rip +0x0], which effectively jumps to the address next to the
+        // instruction. This is useful for 8 bytes jump, this is not optimal but it's functional
+        // because we can spare some bytes.
+        let extended_jump = [0xff_u8, 0x25, 0x00, 0x00, 0x00, 0x00];
+
+        // First we write the jump into our function, which effectively requires 14 bytes.
+        let mut injection: Vec<u8> = Vec::with_capacity(1024);
+        injection.extend_from_slice(&extended_jump);
+        injection.extend_from_slice(&result.new_function.to_le_bytes());
+
+        injection.extend_from_slice(&result.original_bytes[..injection_size]);
+        injection.extend_from_slice(&extended_jump);
+        let original_addr = result.original_function + result.injection_size;
+        injection.extend_from_slice(&original_addr.to_le_bytes());
+
+        result.shellcode_space[..injection.len()].copy_from_slice(&injection);
+        // Initialize internal detour
+        let detour: MaybeUninit<Detour> = MaybeUninit::new(Detour::new(result.original_function, result.injection_size, result.shellcode_space.as_ptr() as _, None));
+        result.detour = detour;
+
+        result
+    }
+
+    pub fn get_original_function_addr(&self) -> usize {
+        self.shellcode_space.as_ptr() as usize + self.injection_size
+    }
+
+}
+
+impl Inject for Trampoline {
+    fn inject(&mut self) {
+        let detour = unsafe { self.detour.assume_init_mut() };
+        detour.inject();
+    }
+
+    fn remove_injection(&mut self) {
+        let detour = unsafe { self.detour.assume_init_mut() };
+        detour.remove_injection();
     }
 }
 
