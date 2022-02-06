@@ -34,22 +34,23 @@ impl ProcessInfo {
         unsafe {
             let process = GetCurrentProcess();
             let mut module_info = winapi::um::psapi::MODULEINFO::default();
-            wrap_winapi!(GetModuleInformation(
-                process,
-                module,
-                &mut module_info,
-                std::mem::size_of::<winapi::um::psapi::MODULEINFO>() as u32,
-            ), x == 0)?;
+            wrap_winapi!(
+                GetModuleInformation(
+                    process,
+                    module,
+                    &mut module_info,
+                    std::mem::size_of::<winapi::um::psapi::MODULEINFO>() as u32,
+                ),
+                x == 0
+            )?;
 
             module_size = module_info.SizeOfImage as usize;
         }
 
         if module_addr == 0x0 {
-            return Err(Error::new(
-                ErrorType::Internal,
-                "Base address can't be 0".to_string(),
-            )
-            .into());
+            return Err(
+                Error::new(ErrorType::Internal, "Base address can't be 0".to_string()).into(),
+            );
         }
 
         if module_size == 0x0 {

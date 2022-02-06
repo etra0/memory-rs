@@ -29,12 +29,10 @@ impl MemProtect {
         let mut old_prot = 0u32;
 
         unsafe {
-            wrap_winapi!(VirtualProtect(
-                addr as LPVOID,
-                size,
-                new_prot,
-                &mut old_prot
-            ), x == 0)?;
+            wrap_winapi!(
+                VirtualProtect(addr as LPVOID, size, new_prot, &mut old_prot),
+                x == 0
+            )?;
         }
 
         Ok(Self {
@@ -56,12 +54,11 @@ impl Drop for MemProtect {
 
 pub struct MemoryPattern {
     pub size: usize,
-    pub pattern: fn(&[u8]) -> bool
+    pub pattern: fn(&[u8]) -> bool,
 }
 
 impl MemoryPattern {
-    pub fn new(size: usize, pattern: fn(&[u8]) -> bool) -> Self
-    {
+    pub fn new(size: usize, pattern: fn(&[u8]) -> bool) -> Self {
         MemoryPattern { size, pattern }
     }
 
@@ -107,8 +104,7 @@ pub unsafe fn hook_function(
     let _mp = MemProtect::new(original_function, len, None)?;
 
     let nops = vec![0x90; len];
-    write_aob(original_function, &nops)
-        .with_context(|| "Couldn't nop original bytes")?;
+    write_aob(original_function, &nops).with_context(|| "Couldn't nop original bytes")?;
 
     // Inject the jmp to the original function
     // address as an AoB
@@ -131,9 +127,8 @@ pub unsafe fn hook_function(
         v
     };
 
-    write_aob(original_function, &injection).with_context(|| {
-        "Couldn't write the injection to the original function"
-    })?;
+    write_aob(original_function, &injection)
+        .with_context(|| "Couldn't write the injection to the original function")?;
 
     FlushInstructionCache(ph, original_function as LPVOID, injection.len());
 
@@ -152,17 +147,11 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
 
     if start_address == 0x0 {
-        return Err(Error::new(
-            ErrorType::Internal,
-            "start_address can't be 0".into(),
-        )
-        .into());
+        return Err(Error::new(ErrorType::Internal, "start_address can't be 0".into()).into());
     }
 
     if len == 0x0 {
-        return Err(
-            Error::new(ErrorType::Internal, "len can't be 0".into()).into()
-        );
+        return Err(Error::new(ErrorType::Internal, "len can't be 0".into()).into());
     }
 
     let mut region_size = 0_usize;
@@ -171,11 +160,14 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     while region_size < len {
         let mut information = MEMORY_BASIC_INFORMATION::default();
         unsafe {
-            wrap_winapi!(VirtualQuery(
-                (start_address + region_size) as LPVOID,
-                &mut information,
-                size_mem_inf
-            ), x == 0)?;
+            wrap_winapi!(
+                VirtualQuery(
+                    (start_address + region_size) as LPVOID,
+                    &mut information,
+                    size_mem_inf
+                ),
+                x == 0
+            )?;
         }
 
         if information.State == MEM_FREE {
@@ -199,11 +191,10 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
 pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
     let mut buf: Vec<u16> = vec![0x0; 255];
 
-    wrap_winapi!(libloaderapi::GetModuleFileNameW(
-        lib as _,
-        buf.as_mut_ptr(),
-        255
-    ), x == 0)?;
+    wrap_winapi!(
+        libloaderapi::GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255),
+        x == 0
+    )?;
     let name = OsString::from_wide(&buf);
     let mut path: PathBuf = name.into();
     path.pop();

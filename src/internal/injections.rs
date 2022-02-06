@@ -1,5 +1,5 @@
-use std::slice::IterMut;
 use std::ops::DerefMut;
+use std::slice::IterMut;
 
 use crate::internal::memory::{hook_function, write_aob, MemoryPattern};
 use crate::internal::memory_region::*;
@@ -42,8 +42,7 @@ impl Detour {
         let mut f_orig = vec![];
 
         unsafe {
-            let slice_ =
-                std::slice::from_raw_parts(entry_point as *const u8, size);
+            let slice_ = std::slice::from_raw_parts(entry_point as *const u8, size);
             f_orig.extend_from_slice(slice_);
         }
 
@@ -64,11 +63,8 @@ impl Detour {
         function_end: Option<&'static mut usize>,
         size_injection: usize,
         offset: Option<isize>,
-    ) -> Result<Detour>
-    {
-        let mut entry_point = region
-            .scan_aob(&scan)?
-            .context("Couldn't find aob")?;
+    ) -> Result<Detour> {
+        let mut entry_point = region.scan_aob(&scan)?.context("Couldn't find aob")?;
 
         if let Some(v) = offset {
             entry_point = ((entry_point as isize) + v) as usize;
@@ -127,9 +123,7 @@ pub struct Injection {
 impl Injection {
     pub fn new(entry_point: usize, f_new: Vec<u8>) -> Injection {
         let aob_size = f_new.len();
-        let slice = unsafe {
-            std::slice::from_raw_parts(entry_point as *const u8, aob_size)
-        };
+        let slice = unsafe { std::slice::from_raw_parts(entry_point as *const u8, aob_size) };
         let mut f_orig = Vec::new();
         f_orig.extend_from_slice(slice);
 
@@ -168,10 +162,10 @@ impl Injection {
         region: &MemoryRegion,
         f_new: Vec<u8>,
         memory_pattern: MemoryPattern,
-    ) -> Result<Injection>
-    {
-        let entry_point = region.scan_aob(&memory_pattern)?
-        .context("Couldn't find aob")?;
+    ) -> Result<Injection> {
+        let entry_point = region
+            .scan_aob(&memory_pattern)?
+            .context("Couldn't find aob")?;
         Ok(Injection::new(entry_point, f_new))
     }
 }

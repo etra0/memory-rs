@@ -10,11 +10,7 @@ pub struct MemoryRegion {
 }
 
 impl MemoryRegion {
-    pub fn new(
-        start_address: usize,
-        size: usize,
-        is_safe: bool,
-    ) -> Result<Self> {
+    pub fn new(start_address: usize, size: usize, is_safe: bool) -> Result<Self> {
         let memory_region = Self {
             start_address,
             size,
@@ -35,16 +31,10 @@ impl MemoryRegion {
         Ok(())
     }
 
-    pub fn scan_aob(
-        &self,
-        pat: &memory::MemoryPattern,
-    ) -> Result<Option<usize>>
-    {
+    pub fn scan_aob(&self, pat: &memory::MemoryPattern) -> Result<Option<usize>> {
         self.check_valid_region()?;
 
-        let data = unsafe {
-            std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
-        };
+        let data = unsafe { std::slice::from_raw_parts(self.start_address as *mut u8, self.size) };
         let index = data.windows(pat.size).position(pat.pattern);
 
         match index {
@@ -53,15 +43,9 @@ impl MemoryRegion {
         }
     }
 
-    pub fn scan_aob_all_matches(
-        &self,
-        pat: &memory::MemoryPattern,
-    ) -> Result<Vec<usize>>
-    {
+    pub fn scan_aob_all_matches(&self, pat: &memory::MemoryPattern) -> Result<Vec<usize>> {
         self.check_valid_region()?;
-        let data = unsafe {
-            std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
-        };
+        let data = unsafe { std::slice::from_raw_parts(self.start_address as *mut u8, self.size) };
         let mut iter = data.windows(pat.size);
         let mut matches = Vec::new();
 
@@ -85,13 +69,10 @@ impl MemoryRegion {
     pub fn scan_aob_all_matches_aligned(
         &self,
         pat: &memory::MemoryPattern,
-        align: Option<usize>
-    ) -> Result<Vec<usize>>
-    {
+        align: Option<usize>,
+    ) -> Result<Vec<usize>> {
         self.check_valid_region()?;
-        let data = unsafe {
-            std::slice::from_raw_parts(self.start_address as *mut u8, self.size)
-        };
+        let data = unsafe { std::slice::from_raw_parts(self.start_address as *mut u8, self.size) };
         let align = align.unwrap_or(4);
         let padding = (align - (pat.size % align)) % align;
         let chunk_size = pat.size + padding;
@@ -106,7 +87,7 @@ impl MemoryRegion {
 
             let val = val.unwrap();
             match matches.last() {
-                Some(&last_val) => matches.push((val + 0x1)*chunk_size + last_val),
+                Some(&last_val) => matches.push((val + 0x1) * chunk_size + last_val),
                 None => matches.push(self.start_address + val),
             };
         }
@@ -131,10 +112,7 @@ impl MemoryRegion {
         }
 
         let data = unsafe {
-            std::slice::from_raw_parts(
-                self.start_address as *mut T,
-                self.size / size_type,
-            )
+            std::slice::from_raw_parts(self.start_address as *mut T, self.size / size_type)
         };
         let mut iter = data.iter();
 
@@ -142,9 +120,7 @@ impl MemoryRegion {
 
         while let Some(val) = iter.position(match_function) {
             match matches.last() {
-                Some(&last_val) => {
-                    matches.push((val + 0x1) * size_type + last_val)
-                }
+                Some(&last_val) => matches.push((val + 0x1) * size_type + last_val),
                 None => matches.push((val * size_type) + self.start_address),
             };
         }

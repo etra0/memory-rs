@@ -4,9 +4,7 @@ use winapi::shared::minwindef::{DWORD, LPCVOID, LPVOID, PDWORD};
 use winapi::um::memoryapi::{
     ReadProcessMemory, VirtualAllocEx, VirtualProtectEx, WriteProcessMemory,
 };
-use winapi::um::winnt::{
-    HANDLE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE,
-};
+use winapi::um::winnt::{HANDLE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE};
 
 pub fn get_aob(h_process: HANDLE, ptr: DWORD_PTR, n: usize) -> Vec<u8> {
     let mut read = 0;
@@ -74,12 +72,7 @@ pub fn write_nops(h_process: HANDLE, ptr: DWORD_PTR, n: usize) {
     write_aob(h_process, ptr, &nops);
 }
 
-pub fn hook_function(
-    h_process: HANDLE,
-    to_hook: DWORD_PTR,
-    f: DWORD_PTR,
-    len: usize,
-) {
+pub fn hook_function(h_process: HANDLE, to_hook: DWORD_PTR, f: DWORD_PTR, len: usize) {
     use std::mem::transmute;
 
     assert!(len >= 5, "Not enough space to inject the shellcode");
@@ -102,8 +95,7 @@ pub fn hook_function(
 
     let _diff = f as i64 - to_hook as i64;
     let relative_address: DWORD = (_diff as DWORD - 5) as DWORD;
-    let relative_aob: [u8; 4] =
-        unsafe { transmute::<DWORD, [u8; 4]>(relative_address.to_le()) };
+    let relative_aob: [u8; 4] = unsafe { transmute::<DWORD, [u8; 4]>(relative_address.to_le()) };
 
     let mut instructions: Vec<u8> = vec![0xE8];
     instructions.extend_from_slice(&relative_aob[..]);
@@ -138,8 +130,7 @@ pub unsafe fn inject_shellcode(
 ) -> DWORD_PTR {
     let f_size = f_end as usize - f_start as usize;
     // get the aob of the function
-    let shellcode_bytes: &'static [u8] =
-        std::slice::from_raw_parts(f_start, f_size);
+    let shellcode_bytes: &'static [u8] = std::slice::from_raw_parts(f_start, f_size);
 
     let mut shellcode_space: DWORD_PTR = 0x0;
     // try to allocate near module
@@ -158,8 +149,7 @@ pub unsafe fn inject_shellcode(
         }
     }
 
-    let written =
-        write_aob(h_process, shellcode_space, &shellcode_bytes.to_vec());
+    let written = write_aob(h_process, shellcode_space, &shellcode_bytes.to_vec());
     assert_eq!(written, f_size, "The size of the injection doesnt match");
 
     let module_injection_address = module_base_address + entry_point;

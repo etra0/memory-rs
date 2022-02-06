@@ -54,11 +54,7 @@ macro_rules! try_winapi {
                 std::stringify!($call),
                 std::io::Error::last_os_error()
             );
-            return Err($crate::error::Error::new(
-                $crate::error::ErrorType::WinAPI,
-                msg,
-            )
-            .into());
+            return Err($crate::error::Error::new($crate::error::ErrorType::WinAPI, msg).into());
         }
     }};
 }

@@ -16,7 +16,7 @@ pub mod external;
 macro_rules! doctest {
     ($x:expr) => {
         #[doc = $x]
-        extern {}
-    }
+        extern "C" {}
+    };
 }
 doctest!(include_str!("../README.md"));
