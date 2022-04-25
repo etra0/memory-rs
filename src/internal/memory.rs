@@ -194,7 +194,10 @@ pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
         libloaderapi::GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255),
         x == 0
     )?;
-    let end_ix = buf.iter().position(|&x| x == 0).expect("Invalid utf16 name");
+    let end_ix = buf
+        .iter()
+        .position(|&x| x == 0)
+        .expect("Invalid utf16 name");
     let name = String::from_utf16(&buf[..end_ix]).unwrap();
     let mut path: PathBuf = name.into();
     path.pop();
