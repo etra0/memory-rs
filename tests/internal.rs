@@ -2,6 +2,7 @@
 use memory_rs::internal::injections::*;
 use memory_rs::internal::memory::*;
 use memory_rs::internal::memory_region::*;
+use memory_rs::internal::process_info::ProcessInfo;
 
 static TO_BE_WRITTEN: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0x00];
 static SEARCH_ARRAY: [u8; 10] = [0xDE, 0xAD, 0xBE, 0xEF, 0xC0, 0xFF, 0xEE, 0xC0, 0xCA, 0xDA];
@@ -271,4 +272,15 @@ fn test_dyn_vec() {
     assert_eq!(test_dyn_vec_original(), "injected");
 
     v.iter_mut().remove_injection();
+}
+
+#[test]
+fn test_resolve_module_path() {
+    let name = unsafe { resolve_module_path(std::ptr::null_mut()).unwrap() };
+    assert_eq!(name.file_stem().unwrap(), "deps");
+}
+
+#[test]
+fn test_proc_inf() {
+    let _ = ProcessInfo::new(Some("Kernel32.dll")).unwrap();
 }

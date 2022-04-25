@@ -2,10 +2,9 @@ use crate::error::{Error, ErrorType};
 use crate::internal::memory_region::*;
 use crate::wrap_winapi;
 use anyhow::Result;
-use std::ffi::CString;
 use winapi::shared::minwindef::HMODULE;
 use winapi::um::{
-    libloaderapi::GetModuleHandleA, processthreadsapi::GetCurrentProcess,
+    libloaderapi::GetModuleHandleW, processthreadsapi::GetCurrentProcess,
     psapi::GetModuleInformation,
 };
 
@@ -22,10 +21,12 @@ impl ProcessInfo {
     pub fn new(name: Option<&str>) -> Result<ProcessInfo> {
         let module = match name {
             Some(n) => {
-                let name_ = CString::new(n)?;
-                unsafe { wrap_winapi!(GetModuleHandleA(name_.as_ptr()), x == 0)? }
+                let mut name_ = n.to_string();
+                name_.push('\0');
+                let name_wide: Vec<u16> = name_.encode_utf16().collect();
+                unsafe { wrap_winapi!(GetModuleHandleW(name_wide.as_ptr()), x == 0)? }
             }
-            None => unsafe { wrap_winapi!(GetModuleHandleA(std::ptr::null()), x == 0)? },
+            None => unsafe { wrap_winapi!(GetModuleHandleW(std::ptr::null()), x == 0)? },
         };
 
         let module_addr = module as usize;

@@ -1,8 +1,6 @@
 use crate::error::{Error, ErrorType};
 use crate::wrap_winapi;
 use anyhow::{Context, Result};
-use std::ffi::OsString;
-use std::os::windows::prelude::*;
 use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
 use winapi::shared::minwindef::LPVOID;
@@ -187,7 +185,8 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
 /// Get DLL's parent path
 /// # Safety
 /// This function can fail on the
-/// GetModuleFileNameA, everything else is unsafe
+/// GetModuleFileNameA, everything else is safe
+/// TODO: Find a way to test this one.
 pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
     let mut buf: Vec<u16> = vec![0x0; 255];
 
@@ -195,7 +194,8 @@ pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
         libloaderapi::GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255),
         x == 0
     )?;
-    let name = OsString::from_wide(&buf);
+    let end_ix = buf.iter().position(|&x| x == 0).expect("Invalid utf16 name");
+    let name = String::from_utf16(&buf[..end_ix]).unwrap();
     let mut path: PathBuf = name.into();
     path.pop();
     Ok(path)
