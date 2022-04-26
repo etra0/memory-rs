@@ -1,6 +1,6 @@
 [package]
 name = "memory-rs"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Sebastian Aedo <sebastian.aedo@sansano.usm.cl>"]
 edition = "2018"
 
