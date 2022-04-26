@@ -1,13 +1,15 @@
 use crate::error::{Error, ErrorType};
 use crate::wrap_winapi;
 use anyhow::{Context, Result};
-use windows_sys::Win32::System::Diagnostics::Debug::FlushInstructionCache;
-use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
-use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtect, MEMORY_BASIC_INFORMATION, VirtualQuery, MEM_FREE};
-use windows_sys::Win32::System::Threading::GetCurrentProcess;
 use std::ffi::c_void;
 use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
+use windows_sys::Win32::System::Diagnostics::Debug::FlushInstructionCache;
+use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
+use windows_sys::Win32::System::Memory::{
+    VirtualProtect, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_FREE, PAGE_EXECUTE_READWRITE,
+};
+use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
 pub struct MemProtect {
     addr: usize,
@@ -142,7 +144,6 @@ pub unsafe fn hook_function(
 /// A region is not valid when it's free or when VirtualQuery returns an
 /// error at the moment of querying that region.
 pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
-
     if start_address == 0x0 {
         return Err(Error::new(ErrorType::Internal, "start_address can't be 0".into()).into());
     }
@@ -189,10 +190,7 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
 pub unsafe fn resolve_module_path(lib: *const c_void) -> Result<PathBuf> {
     let mut buf: Vec<u16> = vec![0x0; 255];
 
-    wrap_winapi!(
-        GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255),
-        x == 0
-    )?;
+    wrap_winapi!(GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255), x == 0)?;
     let end_ix = buf
         .iter()
         .position(|&x| x == 0)

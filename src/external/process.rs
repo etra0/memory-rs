@@ -1,9 +1,12 @@
-use std::ffi::{CStr, c_void};
+use std::ffi::{c_void, CStr};
 use std::io::Error;
 
-use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, CloseHandle};
+use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
-use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, TH32CS_SNAPPROCESS, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPMODULE, TH32CS_SNAPMODULE32, MODULEENTRY32, Module32First, Module32Next};
+use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, Module32First, Module32Next, Process32First, Process32Next,
+    MODULEENTRY32, PROCESSENTRY32, TH32CS_SNAPMODULE, TH32CS_SNAPMODULE32, TH32CS_SNAPPROCESS,
+};
 use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_ALL_ACCESS};
 
 pub struct Process {
@@ -16,13 +19,7 @@ impl Process {
         let process_id = get_process_id(process_name)?;
         let module_base_address = get_module_base(process_id, process_name)?;
 
-        let h_process = unsafe {
-            OpenProcess(
-                PROCESS_ALL_ACCESS,
-                false as i32,
-                process_id,
-            )
-        };
+        let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, false as i32, process_id) };
 
         if h_process == 0 {
             return Err(Error::last_os_error());
@@ -222,12 +219,8 @@ pub fn get_process_id(process_name: &str) -> Result<u32, Error> {
 
 pub fn get_module_base(process_id: u32, module_name: &str) -> Result<usize, Error> {
     let mut module_base_address = 0;
-    let h_snap = unsafe {
-        CreateToolhelp32Snapshot(
-            TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
-            process_id,
-        )
-    };
+    let h_snap =
+        unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id) };
 
     if h_snap == INVALID_HANDLE_VALUE {
         return Err(Error::last_os_error());

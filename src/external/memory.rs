@@ -1,9 +1,16 @@
 use std::ffi::c_void;
 
-use windows_sys::Win32::{Foundation::HANDLE, System::{Memory::{VirtualProtectEx, PAGE_EXECUTE_READWRITE, VirtualAllocEx, MEM_RESERVE, MEM_COMMIT}, Diagnostics::Debug::{WriteProcessMemory, ReadProcessMemory}}};
+use windows_sys::Win32::{
+    Foundation::HANDLE,
+    System::{
+        Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory},
+        Memory::{
+            VirtualAllocEx, VirtualProtectEx, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE,
+        },
+    },
+};
 
 /// Kept for legacy purposes.
-
 
 pub fn get_aob(h_process: HANDLE, ptr: *const c_void, n: usize) -> Vec<u8> {
     let mut read = 0;
