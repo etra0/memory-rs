@@ -25,7 +25,7 @@ memory_rs::scoped_no_mangle! {
 
 
 // function wrapper to be called by DllMain
-pub unsafe extern "system" fn wrapper(lib: winapi::shared::minwindef::LPVOID) -> u32 {
+pub unsafe extern "system" fn wrapper(lib: *mut std::ffi::c_void) -> u32 {
   // ...
   match patch() {
     Ok(_) => println!("Everything is OK"),

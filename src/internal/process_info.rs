@@ -2,16 +2,15 @@ use crate::error::{Error, ErrorType};
 use crate::internal::memory_region::*;
 use crate::wrap_winapi;
 use anyhow::Result;
-use winapi::shared::minwindef::HMODULE;
-use winapi::um::{
-    libloaderapi::GetModuleHandleW, processthreadsapi::GetCurrentProcess,
-    psapi::GetModuleInformation,
-};
+use windows_sys::Win32::Foundation::HINSTANCE;
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::System::ProcessStatus::{K32GetModuleInformation, MODULEINFO};
+use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
 /// Struct that contains some very basic information of a executable or DLL.
 #[derive(Debug)]
 pub struct ProcessInfo {
-    pub handle: HMODULE,
+    pub handle: HINSTANCE,
     pub region: MemoryRegion,
 }
 
@@ -34,13 +33,13 @@ impl ProcessInfo {
         let module_size: usize;
         unsafe {
             let process = GetCurrentProcess();
-            let mut module_info = winapi::um::psapi::MODULEINFO::default();
+            let mut module_info: MODULEINFO = std::mem::zeroed();
             wrap_winapi!(
-                GetModuleInformation(
+                K32GetModuleInformation(
                     process,
                     module,
                     &mut module_info,
-                    std::mem::size_of::<winapi::um::psapi::MODULEINFO>() as u32,
+                    std::mem::size_of::<MODULEINFO>() as u32,
                 ),
                 x == 0
             )?;

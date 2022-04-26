@@ -1,18 +1,14 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, c_void};
 use std::io::Error;
-use std::mem;
-use winapi::shared::basetsd::DWORD_PTR;
-use winapi::shared::minwindef::DWORD;
-use winapi::shared::minwindef::{LPCVOID, LPVOID};
-use winapi::um::handleapi;
-use winapi::um::memoryapi::{ReadProcessMemory, WriteProcessMemory};
-use winapi::um::processthreadsapi::OpenProcess;
-use winapi::um::tlhelp32;
-use winapi::um::winnt::HANDLE;
+
+use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, CloseHandle};
+use windows_sys::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
+use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, TH32CS_SNAPPROCESS, PROCESSENTRY32, Process32First, Process32Next, TH32CS_SNAPMODULE, TH32CS_SNAPMODULE32, MODULEENTRY32, Module32First, Module32Next};
+use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_ALL_ACCESS};
 
 pub struct Process {
     pub h_process: HANDLE,
-    pub module_base_address: DWORD_PTR,
+    pub module_base_address: usize,
 }
 
 impl Process {
@@ -22,13 +18,13 @@ impl Process {
 
         let h_process = unsafe {
             OpenProcess(
-                winapi::um::winnt::PROCESS_ALL_ACCESS,
+                PROCESS_ALL_ACCESS,
                 false as i32,
                 process_id,
             )
         };
 
-        if h_process.is_null() {
+        if h_process == 0 {
             return Err(Error::last_os_error());
         }
 
@@ -40,47 +36,47 @@ impl Process {
 
     /// Writes an array of bytes (as vectors) into the desired address.
     /// It can take relative or absolute values.
-    pub fn write_aob(&self, ptr: DWORD_PTR, data: &[u8], absolute: bool) {
+    pub fn write_aob(&self, ptr: usize, data: &[u8], absolute: bool) {
         let addr = if absolute {
-            ptr
+            ptr as _
         } else {
             self.module_base_address + ptr
         };
 
-        crate::external::memory::write_aob(self.h_process, addr, &data);
+        crate::external::memory::write_aob(self.h_process, addr as _, &data);
     }
 
     /// Writes `n` nops into the desired address
     /// It can take relative or absolute values.
-    pub fn write_nops(&self, ptr: DWORD_PTR, n: usize, absolute: bool) {
+    pub fn write_nops(&self, ptr: usize, n: usize, absolute: bool) {
         let addr = if absolute {
-            ptr
+            ptr as _
         } else {
             self.module_base_address + ptr
         };
 
-        crate::external::memory::write_nops(self.h_process, addr, n);
+        crate::external::memory::write_nops(self.h_process, addr as _, n);
     }
 
     /// Reads `n` bytes from the desired address
     /// It can take relative or absolute values.
-    pub fn get_aob(&self, ptr: DWORD_PTR, n: usize, absolute: bool) -> Vec<u8> {
+    pub fn get_aob(&self, ptr: usize, n: usize, absolute: bool) -> Vec<u8> {
         let addr = if absolute {
-            ptr
+            ptr as _
         } else {
             self.module_base_address + ptr
         };
 
-        let output: Vec<u8> = crate::external::memory::get_aob(self.h_process, addr, n);
+        let output: Vec<u8> = crate::external::memory::get_aob(self.h_process, addr as _, n);
 
         output
     }
 
     // TODO: Move this function out of process because it should be in
     // memory/mod.rs.
-    pub fn read_value<OutputType>(&self, ptr: DWORD_PTR, absolute: bool) -> OutputType {
+    pub fn read_value<OutputType>(&self, ptr: usize, absolute: bool) -> OutputType {
         let addr = if absolute {
-            ptr
+            ptr as _
         } else {
             self.module_base_address + ptr
         };
@@ -92,8 +88,8 @@ impl Process {
         unsafe {
             ReadProcessMemory(
                 self.h_process,
-                addr as LPCVOID,
-                &mut buffer as *mut OutputType as LPVOID,
+                addr as *const c_void,
+                &mut buffer as *mut OutputType as *mut c_void,
                 s_buffer,
                 &mut read,
             );
@@ -103,7 +99,7 @@ impl Process {
         buffer
     }
 
-    pub fn write_value<InputType>(&self, ptr: DWORD_PTR, output: InputType, absolute: bool) {
+    pub fn write_value<InputType>(&self, ptr: usize, output: InputType, absolute: bool) {
         let addr = if absolute {
             ptr
         } else {
@@ -116,8 +112,8 @@ impl Process {
         unsafe {
             WriteProcessMemory(
                 self.h_process,
-                addr as LPVOID,
-                (&output as *const InputType) as LPVOID,
+                addr as *const c_void,
+                (&output as *const InputType) as *mut c_void,
                 s,
                 &mut written,
             );
@@ -136,73 +132,71 @@ impl Process {
     /// bytes correctly, or it could just simply fail because OS reasons.
     pub unsafe fn inject_shellcode(
         &self,
-        entry_point: DWORD_PTR,
+        entry_point: *const u32,
         instruction_size: usize,
         f_start: *const u8,
         f_end: *const u8,
-    ) -> DWORD_PTR {
+    ) -> *const c_void {
         crate::external::memory::inject_shellcode(
             self.h_process,
-            self.module_base_address,
-            entry_point,
+            self.module_base_address as _,
+            entry_point as _,
             instruction_size,
             f_start,
             f_end,
         )
     }
 
-    pub fn read_string_array(
-        &self,
-        address: DWORD_PTR,
-        starting_index: usize,
-        ending: &[u8],
-    ) -> Vec<(usize, String)> {
-        let mut c_address = address;
+    // pub fn read_string_array(
+    //     &self,
+    //     address: *const u32,
+    //     starting_index: usize,
+    //     ending: &[u8],
+    // ) -> Vec<(usize, String)> {
+    //     let mut c_address = address;
 
-        let mut data: Vec<(usize, String)> = vec![];
+    //     let mut data: Vec<(usize, String)> = vec![];
 
-        let mut c_index = starting_index;
+    //     let mut c_index = starting_index;
 
-        let mut c_string = String::from("");
-        loop {
-            let current_read: Vec<u8> = self.get_aob(c_address, 2, true);
+    //     let mut c_string = String::from("");
+    //     loop {
+    //         let current_read: Vec<u8> = self.get_aob(c_address, 2, true);
 
-            if current_read[..] == *ending {
-                break;
-            }
-            if current_read[0] == 0x00 {
-                data.push((c_index, c_string));
-                c_string = String::from("");
-                c_index += 1;
-                c_address += 1;
-                continue;
-            }
+    //         if current_read[..] == *ending {
+    //             break;
+    //         }
+    //         if current_read[0] == 0x00 {
+    //             data.push((c_index, c_string));
+    //             c_string = String::from("");
+    //             c_index += 1;
+    //             c_address += 1;
+    //             continue;
+    //         }
 
-            c_string.push(current_read[0] as char);
-            c_address += 1;
-        }
+    //         c_string.push(current_read[0] as char);
+    //         c_address += 1;
+    //     }
 
-        data
-    }
+    //     data
+    // }
 }
 
-pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
-    let mut process_id: DWORD = 0;
-    let h_snap = unsafe { tlhelp32::CreateToolhelp32Snapshot(tlhelp32::TH32CS_SNAPPROCESS, 0) };
+pub fn get_process_id(process_name: &str) -> Result<u32, Error> {
+    let mut process_id: u32 = 0;
+    let h_snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
 
-    if h_snap == handleapi::INVALID_HANDLE_VALUE {
+    if h_snap == INVALID_HANDLE_VALUE {
         return Err(Error::last_os_error());
     }
 
-    let mut process_entry = tlhelp32::PROCESSENTRY32 {
-        dwSize: mem::size_of::<tlhelp32::PROCESSENTRY32>() as u32,
-        ..Default::default()
-    };
+    let mut process_entry: PROCESSENTRY32 = unsafe { std::mem::zeroed() };
+    process_entry.dwSize = std::mem::size_of::<PROCESSENTRY32> as _;
 
     unsafe {
-        if tlhelp32::Process32First(h_snap, &mut process_entry) == 1 {
+        if Process32First(h_snap, &mut process_entry) == 1 {
             process_id = loop {
-                let current_name = CStr::from_ptr(process_entry.szExeFile.as_ptr())
+                let current_name = CStr::from_ptr(process_entry.szExeFile.as_ptr() as _)
                     .to_str()
                     .expect("No string found");
 
@@ -210,13 +204,13 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
                     break process_entry.th32ProcessID;
                 }
 
-                if tlhelp32::Process32Next(h_snap, &mut process_entry) == 0 {
+                if Process32Next(h_snap, &mut process_entry) == 0 {
                     break 0;
                 }
             }
         }
 
-        handleapi::CloseHandle(h_snap);
+        CloseHandle(h_snap);
     }
 
     if process_id == 0 {
@@ -226,42 +220,40 @@ pub fn get_process_id(process_name: &str) -> Result<DWORD, Error> {
     Ok(process_id)
 }
 
-pub fn get_module_base(process_id: DWORD, module_name: &str) -> Result<DWORD_PTR, Error> {
-    let mut module_base_address: DWORD_PTR = 0x0;
+pub fn get_module_base(process_id: u32, module_name: &str) -> Result<usize, Error> {
+    let mut module_base_address = 0;
     let h_snap = unsafe {
-        tlhelp32::CreateToolhelp32Snapshot(
-            tlhelp32::TH32CS_SNAPMODULE | tlhelp32::TH32CS_SNAPMODULE32,
+        CreateToolhelp32Snapshot(
+            TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
             process_id,
         )
     };
 
-    if h_snap == handleapi::INVALID_HANDLE_VALUE {
+    if h_snap == INVALID_HANDLE_VALUE {
         return Err(Error::last_os_error());
     }
 
-    let mut module_entry = tlhelp32::MODULEENTRY32 {
-        dwSize: mem::size_of::<tlhelp32::MODULEENTRY32>() as u32,
-        ..Default::default()
-    };
+    let mut module_entry: MODULEENTRY32 = unsafe { std::mem::zeroed() };
+    module_entry.dwSize = std::mem::size_of::<MODULEENTRY32> as _;
 
     unsafe {
-        if tlhelp32::Module32First(h_snap, &mut module_entry) != 0 {
+        if Module32First(h_snap, &mut module_entry) != 0 {
             module_base_address = loop {
-                let current_name = CStr::from_ptr(module_entry.szModule.as_ptr())
+                let current_name = CStr::from_ptr(module_entry.szModule.as_ptr() as _)
                     .to_str()
                     .expect("No string found");
 
                 if current_name == module_name {
-                    break module_entry.modBaseAddr as DWORD_PTR;
+                    break module_entry.modBaseAddr as usize;
                 }
 
-                if tlhelp32::Module32Next(h_snap, &mut module_entry) == 0 {
+                if Module32Next(h_snap, &mut module_entry) == 0 {
                     break 0;
                 }
             }
         }
 
-        handleapi::CloseHandle(h_snap);
+        CloseHandle(h_snap);
     }
 
     if module_base_address == 0 {

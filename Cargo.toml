@@ -8,7 +8,7 @@ edition = "2018"
 anyhow = "1.0.34"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "tlhelp32", "handleapi", "impl-default", "memoryapi", "processthreadsapi", "psapi", "libloaderapi"] }
+windows-sys = { version = "0.35", features = [ "Win32_System_LibraryLoader", "Win32_Foundation", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_System_Memory", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_SystemServices", "Win32_Security" ] }
 
 [features]
 default = ["impl-drop"]

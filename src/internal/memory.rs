@@ -1,13 +1,13 @@
 use crate::error::{Error, ErrorType};
 use crate::wrap_winapi;
 use anyhow::{Context, Result};
+use windows_sys::Win32::System::Diagnostics::Debug::FlushInstructionCache;
+use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
+use windows_sys::Win32::System::Memory::{PAGE_EXECUTE_READWRITE, VirtualProtect, MEMORY_BASIC_INFORMATION, VirtualQuery, MEM_FREE};
+use windows_sys::Win32::System::Threading::GetCurrentProcess;
+use std::ffi::c_void;
 use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
-use winapi::shared::minwindef::LPVOID;
-use winapi::um::libloaderapi;
-use winapi::um::memoryapi::{VirtualProtect, VirtualQuery};
-use winapi::um::processthreadsapi::{FlushInstructionCache, GetCurrentProcess};
-use winapi::um::winnt::{MEM_FREE, PAGE_EXECUTE_READWRITE};
 
 pub struct MemProtect {
     addr: usize,
@@ -28,7 +28,7 @@ impl MemProtect {
 
         unsafe {
             wrap_winapi!(
-                VirtualProtect(addr as LPVOID, size, new_prot, &mut old_prot),
+                VirtualProtect(addr as *const c_void, size, new_prot, &mut old_prot),
                 x == 0
             )?;
         }
@@ -78,7 +78,7 @@ pub unsafe fn write_aob(ptr: usize, source: &[u8]) -> Result<()> {
     copy_nonoverlapping(source.as_ptr(), ptr as *mut u8, size);
 
     let ph = GetCurrentProcess();
-    FlushInstructionCache(ph, ptr as LPVOID, size);
+    FlushInstructionCache(ph, ptr as *const c_void, size);
 
     Ok(())
 }
@@ -128,7 +128,7 @@ pub unsafe fn hook_function(
     write_aob(original_function, &injection)
         .with_context(|| "Couldn't write the injection to the original function")?;
 
-    FlushInstructionCache(ph, original_function as LPVOID, injection.len());
+    FlushInstructionCache(ph, original_function as *const c_void, injection.len());
 
     // Inject the jmp back if required
     if let Some(p) = new_function_end {
@@ -142,7 +142,6 @@ pub unsafe fn hook_function(
 /// A region is not valid when it's free or when VirtualQuery returns an
 /// error at the moment of querying that region.
 pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
-    use winapi::um::winnt::MEMORY_BASIC_INFORMATION;
 
     if start_address == 0x0 {
         return Err(Error::new(ErrorType::Internal, "start_address can't be 0".into()).into());
@@ -156,11 +155,11 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
     let size_mem_inf = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
 
     while region_size < len {
-        let mut information = MEMORY_BASIC_INFORMATION::default();
+        let mut information: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
         unsafe {
             wrap_winapi!(
                 VirtualQuery(
-                    (start_address + region_size) as LPVOID,
+                    (start_address + region_size) as *const c_void,
                     &mut information,
                     size_mem_inf
                 ),
@@ -187,11 +186,11 @@ pub fn check_valid_region(start_address: usize, len: usize) -> Result<()> {
 /// This function can fail on the
 /// GetModuleFileNameA, everything else is safe
 /// TODO: Find a way to test this one.
-pub unsafe fn resolve_module_path(lib: LPVOID) -> Result<PathBuf> {
+pub unsafe fn resolve_module_path(lib: *const c_void) -> Result<PathBuf> {
     let mut buf: Vec<u16> = vec![0x0; 255];
 
     wrap_winapi!(
-        libloaderapi::GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255),
+        GetModuleFileNameW(lib as _, buf.as_mut_ptr(), 255),
         x == 0
     )?;
     let end_ix = buf

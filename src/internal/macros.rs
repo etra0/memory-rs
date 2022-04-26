@@ -7,18 +7,18 @@ macro_rules! main_dll {
         #[no_mangle]
         #[allow(non_snake_case)]
         pub extern "system" fn DllMain(
-            lib: winapi::shared::minwindef::HINSTANCE,
+            lib: windows_sys::Win32::Foundation::HINSTANCE,
             reason: u32,
             _: usize,
         ) -> u32 {
             unsafe {
                 match reason {
-                    winapi::um::winnt::DLL_PROCESS_ATTACH => {
-                        winapi::um::processthreadsapi::CreateThread(
+                    windows_sys::Win32::System::SystemServices::DLL_PROCESS_ATTACH => {
+                        windows_sys::Win32::System::Threading::CreateThread(
                             std::ptr::null_mut(),
                             0,
                             Some($func),
-                            lib as winapi::shared::minwindef::LPVOID,
+                            lib as *const std::ffi::c_void,
                             0,
                             std::ptr::null_mut(),
                         );
