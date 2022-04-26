@@ -1,7 +1,9 @@
 [package]
 name = "memory-rs"
 version = "0.2.5"
-authors = ["Sebastian Aedo <sebastian.aedo@sansano.usm.cl>"]
+authors = ["Sebastian Aedo <sebastian.aedo29@gmail.com>"]
+license = "MIT"
+description = "Library for game hacking in Windows."
 edition = "2018"
 
 [dependencies]
