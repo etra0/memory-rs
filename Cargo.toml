@@ -15,3 +15,6 @@ windows-sys = { version = "0.35", features = [ "Win32_System_LibraryLoader", "Wi
 [features]
 default = ["impl-drop"]
 impl-drop = []
+
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc"]
